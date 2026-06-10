@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result, bail};
 use bytes::Bytes;
 
 /// Ensure we are reading a parquet file by checking whether
@@ -11,7 +11,9 @@ use bytes::Bytes;
 /// ```
 ///
 /// [file-format]: https://parquet.apache.org/docs/file-format/
-#[allow(unused_variables)]
 pub fn ensure_header_footer_magic(data: Bytes) -> Result<()> {
-    todo!("step01: implement magic number")
+    if data.len() < 8 || !data.starts_with(b"PAR1") || !data.ends_with(b"PAR1") {
+        bail!("Magic: not a parquet file")
+    }
+    Ok(())
 }
