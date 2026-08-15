@@ -1,0 +1,8 @@
+**/target/
+**/book/
+
+*.parquet
+/.idea/.gitignore
+/.idea/modules.xml
+/.idea/parquet-parser.iml
+/.idea/vcs.xml

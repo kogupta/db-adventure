@@ -1,0 +1,9 @@
+col_bool,col_integer,col_real,col_string
+true,1,1.1,one
+false,2,2.2,two
+true,3,3.3,three
+true,4,4.4,four
+false,5,5.5,five
+false,6,6.6,six
+true,7,7.7,seven
+true,8,8.8,eight
