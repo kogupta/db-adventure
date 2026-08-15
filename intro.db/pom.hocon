@@ -1,0 +1,65 @@
+{
+  modelVersion: "4.1.0"
+  root: true
+  groupId: "intro.db.learning"
+  artifactId: "intro-db"
+  version: "0.0.1-SNAPSHOT"
+  packaging: "jar"
+
+  properties: {
+    java.version: "25"
+    maven.compiler.release: "25"
+    arrow.version: "18.1.0"
+    calcite.version: "1.38.0"
+    junit.version: "5.11.3"
+    project.build.sourceEncoding: "UTF-8"
+  }
+
+  dependencies: [
+    {
+      groupId: "org.apache.calcite"
+      artifactId: "calcite-core"
+      version: "${calcite.version}"
+    }
+    {
+      groupId: "org.apache.arrow"
+      artifactId: "arrow-vector"
+      version: "${arrow.version}"
+    }
+    {
+      groupId: "org.apache.arrow"
+      artifactId: "arrow-memory-netty"
+      version: "${arrow.version}"
+    }
+    {
+      groupId: "org.junit.jupiter"
+      artifactId: "junit-jupiter"
+      version: "${junit.version}"
+      scope: "test"
+    }
+  ]
+
+  build: {
+    plugins: [
+      {
+        groupId: "org.apache.maven.plugins"
+        artifactId: "maven-compiler-plugin"
+        version: "3.13.0"
+        configuration: {
+          release: "${java.version}"
+          compilerArgs: [
+            "--enable-preview"
+          ]
+        }
+      }
+      {
+        groupId: "org.apache.maven.plugins"
+        artifactId: "maven-surefire-plugin"
+        version: "3.2.5"
+        configuration: {
+          argLine: "--enable-preview -XX:+UseCompactObjectHeaders"
+        }
+      }
+    ]
+  }
+}
