@@ -92,7 +92,7 @@ impl Page {
 
 /// Read a page data into [`Page`].
 ///
-/// This function receives `data` at page boundary,  and `codec` (to handle compression),
+/// This function receives `data` at page boundary, and `codec` (to handle compression),
 /// and returns a [`Page`] and remaining bytes.
 #[allow(unused_variables)]
 pub fn read_page(data: Bytes, codec: CompressionCodec) -> Result<(Page, Bytes)> {
