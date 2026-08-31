@@ -1,0 +1,17 @@
+{
+  "mcp": {
+    "servers": {
+      "jetbrains": {
+        "type": "http",
+        "url": "http://127.0.0.1:64342/stream"
+      },
+      "intellij-index": {
+        "type": "http",
+        "url": "http://127.0.0.1:29170/index-mcp/streamable-http"
+      }
+    }
+  },
+  "hooks": {
+    "events": {}
+  }
+}
