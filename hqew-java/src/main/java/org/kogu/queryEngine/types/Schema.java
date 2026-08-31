@@ -5,8 +5,20 @@ import java.util.*;
 import static java.util.stream.Collectors.joining;
 
 public final class Schema {
-    private final Map<String, Field> fields;
-    private Schema(Map<String, Field> fields) {this.fields = fields;}
+    final Map<String, Field> fields;
+    final List<Field> fieldsList;   // int -> field map
+    private final Map<Field, Integer> fieldIndex;
+
+    private Schema(Map<String, Field> fields) {
+        this.fields = fields;
+        this.fieldsList = new ArrayList<>(fields.values());
+
+        this.fieldIndex = new HashMap<>();
+        for (int i = 0; i < fieldsList.size(); i++) {
+            Field f = fieldsList.get(i);
+            fieldIndex.put(f, i);
+        }
+    }
 
     public Field field(String name) {
         Field f = fields.get(name);
@@ -31,6 +43,15 @@ public final class Schema {
         }
 
         return new Schema(fs);
+    }
+
+    public int indexOfField(String name) {
+        return fieldIndex.get(field(name));
+    }
+
+    public Field fieldAtIndex(int index) {
+        Objects.checkIndex(index, fieldsList.size());
+        return fieldsList.get(index);
     }
 
     private String asString() {
