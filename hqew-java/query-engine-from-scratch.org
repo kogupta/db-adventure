@@ -326,19 +326,23 @@ The block between BEGIN_MUTABLE_STATE and END_MUTABLE_STATE is rewritten in plac
 #+begin_src clojure
 {:state-version 1
  :course-status :in-progress
- :position {:unit "qe.03.column-vector" :stage "stage-1" :checkpoint nil :status :in-progress}
+ :position {:unit "qe.04.nulls" :stage "stage-1" :checkpoint nil :status :in-progress}
  :environment {:language :java :jdk 25 :build-tool :maven :repo-root "hqew-java" :test-framework :junit-5}
  :mastery {"qe.00.orientation" :demonstrated
            "qe.01.row-vs-column" :demonstrated
-           "qe.02.types-schema" :demonstrated}
+           "qe.02.types-schema" :demonstrated
+           "qe.03.column-vector" :demonstrated}
  :implementation
  {:capabilities
   ["lesson1 Main: graduation-query shape (filter->group->avg->sort desc) over both row objects and parallel int[] columns; equivalence test passes (rowEval/columnEval)"
-   "types package: Type (sealed interface, nested Scalar enum: BOOLEAN/INT32/INT64/FLOAT64/UTF8), Field(name,type,nullable) record, Schema.from/field/project with duplicate rejection and ordered projection; JUnit tests green"]
-  :current-design ["Type as sealed interface chosen over enum for future nested types; Schema stores LinkedHashMap name->field"]
+   "types package: Type (sealed interface, nested Scalar enum: BOOLEAN/INT32/INT64/FLOAT64/UTF8), Field(name,type,nullable) record, Schema.from/field/project with duplicate rejection and ordered projection; JUnit tests green"
+   "types Vector: sealed interface, five record vectors (int/long/double/String/boolean), each an offset+length window over a backing array; validated window + bounds-checked value(i); 13 tests green incl. window-relative reads and edge throw past valid backing index"]
+  :current-design ["Type as sealed interface chosen over enum for future nested types; Schema stores LinkedHashMap name->field; Vector contract stated mechanism-free: typed finite sequence, type()+length()+value(i), storage invisible"]
   :known-correctness-gaps
-  ["No expression type-checking yet: fare_amount + passenger_name not rejectable until expression units"
-   "Trip constructor rejects <=0 fares/passengers; real data has zero rows and SQL NULL semantics — revisit at nulls unit"]
+  ["Vector.validateWindow uses reflective Array.getLength on every construction (perf-only, parked)"
+   "Record accessor values() leaks backing array, bypassing window (accepted pragmatically)"
+   "No expression type-checking yet: fare_amount + passenger_name not rejectable until expression units"
+   "Trip constructor rejects <=0 fares/passengers; real data has zero rows and SQL NULL semantics — central to next unit"]
   :known-performance-gaps []}
  :open-loops []
  :durable-decisions
@@ -347,7 +351,7 @@ The block between BEGIN_MUTABLE_STATE and END_MUTABLE_STATE is rewritten in plac
   {:id "D-003" :decision "Use a hybrid Parquet path: educational byte-level reader/labs, then a production-capable Java Parquet library." :reason "Understand Parquet without making format completeness the whole course."}
   {:id "D-004" :decision "Introduce SQL late and use Apache Calcite for parsing/validation/SQL-to-relational machinery." :reason "Learner implements query engine rather than spending course on SQL grammar."}
   {:id "D-005" :decision "Tutor does not provide implementation code by default." :reason "Learner writes engine; tutor explains, probes, reviews, and escalates hints."}]
- :next-action "qe.03: implement minimal column-vector family (IntVector/LongVector/DoubleVector/StringVector/BooleanVector, no nulls yet); probes — what invariants does an IntVector wrapping int[] hold, and should the vector know its field name?"}
+ :next-action "qe.04: probes — how can int[] represent [7,null,9] without boxing, and if slot 1 is null does its underlying int matter? Build: separate validity representation (BitSet/bitmap ok), no SQL 3VL yet."}
 #+end_src
 # END_MUTABLE_STATE
 
