@@ -91,7 +91,7 @@ public final class ExprPrinter {
         };
     }
 
-    public static void main(String[] args) {
+    static void main() {
         Expr e = logical(
                 binary(col("trip_distance"), GT, ofInt(5)),
                 LogicalOp.AND,
