@@ -11,3 +11,6 @@
 .DS_Store
 .vscode/
 howQueryEnginesWork/
+# Local editor & MCP configurations
+/hqew-java/.mcp.json
+/hqew-java/.zcode/
