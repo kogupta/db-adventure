@@ -1,8 +1,13 @@
 package org.kogu.queryEngine.types;
 
+import java.util.BitSet;
 import java.util.List;
 import java.util.Objects;
 import org.kogu.queryEngine.types.Expr.*;
+import org.kogu.queryEngine.types.Type.Scalar;
+
+import static org.kogu.queryEngine.types.ComparisionOps.GT;
+import static org.kogu.queryEngine.types.Exprs.*;
 
 public final class ExprPrinter {
     private ExprPrinter() {}
@@ -40,7 +45,8 @@ public final class ExprPrinter {
         };
     }
 
-    private static void renderTree(Expr expr, Schema schema, String prefix, String childPrefix, StringBuilder sb) {
+    private static void renderTree(Expr expr, Schema schema, String prefix,
+                                   String childPrefix, StringBuilder sb) {
         sb.append(prefix).append(formatNode(expr, schema)).append(System.lineSeparator());
 
         List<Expr> children = getChildren(expr);
@@ -83,5 +89,34 @@ public final class ExprPrinter {
             case UnaryExpr(_, var e) -> List.of(e);
             case LogicalExpr(var left, _, var right) -> List.of(left, right);
         };
+    }
+
+    public static void main(String[] args) {
+        Expr e = logical(
+                binary(col("trip_distance"), GT, ofInt(5)),
+                LogicalOp.AND,
+                binary(col("fare_amount"), GT, ofInt(20)));
+
+        System.out.println(printTree(e));
+
+        BitSet distNulls = new BitSet();
+        distNulls.set(2);
+        distNulls.set(7);
+
+        BitSet fareNulls = new BitSet();
+        fareNulls.set(5);
+
+        Schema schema = Schema.from(List.of(
+                new Field("trip_distance", Scalar.INT32),
+                new Field("fare_amount", Scalar.INT32)
+        ));
+
+        RecordBatch batch = new RecordBatch(schema, new Vector[]{
+                Vectors.intVector(new int[]{3, 8, 999, 5, 12, 1, 6, 999}, distNulls),
+                Vectors.intVector(new int[]{15, 25, 30, 5, 50, 999, 40, 20}, fareNulls)
+        });
+
+        ExprTracer.TraceReport report = ExprTracer.trace(e, batch);
+        System.out.println(report);
     }
 }

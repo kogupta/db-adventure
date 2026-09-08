@@ -9,7 +9,7 @@ import java.util.function.IntPredicate;
 
 import static org.kogu.queryEngine.types.Vector.*;
 
-final class ExprEvaluator {
+public final class ExprEvaluator {
     private ExprEvaluator() {}
 
     public static Vector eval(Expr expr, RecordBatch batch) {

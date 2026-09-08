@@ -326,7 +326,7 @@ The block between BEGIN_MUTABLE_STATE and END_MUTABLE_STATE is rewritten in plac
 #+begin_src clojure
 {:state-version 1
  :course-status :in-progress
- :position {:unit "qe.07.vector-expression-eval" :stage "stage-1" :checkpoint nil :status :in-progress}
+ :position {:unit "qe.08.operator-contract" :stage "stage-2" :checkpoint nil :status :ready}
  :environment {:language :java :jdk 25 :build-tool :maven :repo-root "hqew-java" :test-framework :junit-5}
  :mastery {"qe.00.orientation" :demonstrated
            "qe.01.row-vs-column" :demonstrated
@@ -334,7 +334,8 @@ The block between BEGIN_MUTABLE_STATE and END_MUTABLE_STATE is rewritten in plac
            "qe.03.column-vector" :demonstrated
            "qe.04.nulls" :demonstrated
            "qe.05.record-batch" :demonstrated
-           "qe.06.expression-tree" :demonstrated}
+           "qe.06.expression-tree" :demonstrated
+           "qe.07.vector-expression-eval" :demonstrated}
  :implementation
  {:capabilities
   ["lesson1 Main: graduation-query shape (filter->group->avg->sort desc) over both row objects and parallel int[] columns; equivalence test passes (rowEval/columnEval)"
@@ -346,12 +347,15 @@ The block between BEGIN_MUTABLE_STATE and END_MUTABLE_STATE is rewritten in plac
    "QE-06 completion: expression = per-row scalar function (never changes row count); operator = relation-to-relation (row count/schema changes); distinction articulated"
    "qe.07 semantics settled before code: expression = map (8->8), filter operator = filter (8->5), aggregate = fold (8->1); comparison/arithmetic validity = AND of input validities; AND/OR need three-valued logic with a dominant value (false dominates AND, true dominates OR) so those kernels must read values even at invalid slots"
    "Vector is now a 3-level hierarchy: Vector (sealed) -> element-type interfaces IntVec/LongVec/DoubleVec/BoolVec/Utf8Vec (each declares value(int) and a default type()) -> storage records (windowed array vector, or Constant* with no BitSet). Kernels name element type only, so constant-vs-windowed storage never reaches a switch arm. offset() and nullIndices() are off the interface; isNull(int) is the whole null contract"
+   "ExprEvaluatorTest: 4 behavioral checks green (45 tests total) — length == rowCount over 26 expression shapes; GT over a null-bearing batch; the full 3VL AND/OR table including both-null; boundary invisibility across one 8-row batch against windows of 3+3+2, covering arithmetic, comparison, and a compound AND with a literal operand"
    "ExprEvaluator: static eval(Expr, RecordBatch) -> Vector. ColumnRef returns the batch vector unchanged, literals build Constant*, arithmetic/comparison dispatch one arm per element type, 3VL AND/OR/NOT correct including the both-null case; kernels share a perSlot(bothNonNull, writeSlot, length) driver"
    "qe.07 ExprEvaluator tests: pins rowCount preservation across all AST shapes, null propagation with differing-junk invariance on trip_distance > 5, 3VL short-circuit (false AND null / true OR null), boundary invisibility (8-row batch vs 3+3+2 concatenated), and mixed-type rejection (TypeMismatchException)"]
   :current-design ["Type as sealed interface chosen over enum for future nested types; Schema stores LinkedHashMap name->field; Vector contract mechanism-free; nulls are data not holes; batch boundaries are execution detail; Expr type rules reject mixed widths deliberately (INT32+INT64 rejected until a query forces coercion)"]
   :known-correctness-gaps
   ["RecordBatch.vectors() returns mutable internal array (encapsulation pass pending)"
-   "Record accessors values()/nullIndices() leak internals; hiding nullIndices() would make BitSet indexing convention an internal detail (encapsulation deferred)"]
+   "Record accessors values()/nullIndices() still leak the backing array on windowed vectors, though nullIndices() is now off the Vector interface"
+   "qe.07 test 2 uses junk 999 at null slots but asserts only isNull, so it does not prove that kernels skip reading null slots; a differing-junk comparison would"
+   "No test that eval rejects mixed operand types (c_int + c_long must throw TypeMismatchException from the numeric default arm)"]
   :known-performance-gaps
   ["Kernels allocate a fresh result array per batch; production engines reuse an operator-owned output buffer, or write in place when a vector has one reader (DuckDB/Velox refcount). Revisit at qe.35."
    "perSlot driver puts two lambdas in the inner loop shared by eight kernels, so the call site is megamorphic and stops inlining. Revisit at qe.35."]}
@@ -362,8 +366,9 @@ The block between BEGIN_MUTABLE_STATE and END_MUTABLE_STATE is rewritten in plac
   {:id "D-003" :decision "Use a hybrid Parquet path: educational byte-level reader/labs, then a production-capable Java Parquet library." :reason "Understand Parquet without making format completeness the whole course."}
   {:id "D-004" :decision "Introduce SQL late and use Apache Calcite for parsing/validation/SQL-to-relational machinery." :reason "Learner implements query engine rather than spending course on SQL grammar."}
   {:id "D-005" :decision "Tutor does not provide implementation code by default." :reason "Learner writes engine; tutor explains, probes, reviews, and escalates hints."}
+  {:id "D-007" :decision "Vector splits by element type before storage: Vector -> IntVec/LongVec/DoubleVec/BoolVec/Utf8Vec -> record storages." :reason "Kernels name element type only, so constant-vs-windowed storage never multiplies switch arms; arm count is ops x type rather than ops x storage x storage."}
   {:id "D-006" :decision "Literals evaluate to a length-carrying Scalar Vector variant that may escape the evaluator (option A); consumers switch on it." :reason "Avoids a 65KB filled array per batch per literal; sealed Vector makes the compiler flag every consumer that must handle it."}]
- :next-action "qe.07 completion: trace a nested expression over one batch, restate expression against relational operator, mark M0, advance to qe.08.operator-contract. Build notes: JDK 26 required (pom sets release 26); run mvn clean after editing any permits clause, else stale classes throw IncompatibleClassChangeError."}
+ :next-action "M0 reached. qe.07 closed: learner traced (trip_distance > 5) AND (fare_amount > 20) over 8 rows with both dominant-value rows correct, named the allocation profile (ColumnRef copies nothing, each kernel allocates one result array), and derived the filter-operator boundary — WHERE keeps only TRUE, drops false and null, copies surviving rows of every column, and returns a new RecordBatch with a smaller rowCount. Selection vectors were previewed as the qe.11 alternative to copying. Start qe.08.operator-contract. Build notes: JDK 26 required (pom sets release 26); run mvn clean after editing any permits clause, else stale classes throw IncompatibleClassChangeError."}
 #+end_src
 # END_MUTABLE_STATE
 
