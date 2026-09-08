@@ -62,7 +62,7 @@ class RecordBatchTest {
                 Vectors.intVector(new int[]{6, 7, 8}), fareAmount});
 
         assertEquals(3, batch.rowCount());
-        assertSame(fareAmount, batch.vector("fare_amount"));
+        assertSame(fareAmount, batch.vectorOf("fare_amount"));
     }
 
     @Test
@@ -104,7 +104,7 @@ class RecordBatchTest {
     private static List<Integer> readTripDistances(List<RecordBatch> batches) {
         List<Integer> rows = new ArrayList<>();
         for (RecordBatch batch : batches) {
-            Vector.IntVector distances = (Vector.IntVector) batch.vector("trip_distance");
+            Vector.IntVector distances = (Vector.IntVector) batch.vectorOf("trip_distance");
             for (int row = 0; row < batch.rowCount(); row++) {
                 rows.add(distances.value(row));
             }

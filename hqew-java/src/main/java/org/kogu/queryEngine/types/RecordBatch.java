@@ -42,8 +42,7 @@ public final class RecordBatch {
 
     public int rowCount() {return rowCount;}
 
-    public Vector vector(String name) {
+    public Vector vectorOf(String name) {
         return vectors[schema.indexOfField(name)];
     }
-
 }

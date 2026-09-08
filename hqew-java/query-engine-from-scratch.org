@@ -339,15 +339,15 @@ The block between BEGIN_MUTABLE_STATE and END_MUTABLE_STATE is rewritten in plac
  {:capabilities
   ["lesson1 Main: graduation-query shape (filter->group->avg->sort desc) over both row objects and parallel int[] columns; equivalence test passes (rowEval/columnEval)"
    "types package: Type (sealed interface, nested Scalar enum: BOOLEAN/INT32/INT64/FLOAT64/UTF8), Field(name,type,nullable) record, Schema.from/field/project with duplicate rejection and ordered projection; JUnit tests green"
-   "types Vector: sealed interface, five record vectors (int/long/double/String/boolean), each an offset+length window over a backing array; validated window + bounds-checked value(i); 13 tests green incl. window-relative reads and edge throw past valid backing index"
-   "Vector nulls: BitSet nullIndices (absolute array-index convention, pinned by window test), isNull(i) bounds-checked, value(i) at null slot returns unobservable junk; 6 null-bitmap tests green incl. differing-junk/gated-read-identical invariant"]
-   "RecordBatch: schema + vectors, constructor checks width/type-agreement/equal-lengths, rowCount derived, vector(name) via schema position; 5 tests green incl. boundary-invisibility over windowed slices of shared arrays"]
-   "Expr AST: sealed interface (ColumnRef, typed Literal records, BinaryExpr/UnaryExpr/LogicalExpr), outputType(Schema) recursive type rules with deliberate mixed-width rejection, collectReferences; 8 tests green"
-   "QE-06 completion: expression = per-row scalar function (never changes row count); operator = relation-to-relation (row count/schema changes); distinction articulated"]
+   "types Vector: sealed interface, five record vectors (int/long/double/String/boolean), each an offset+length window over a backing array; Vectors provides typed convenience factories; validated window + bounds-checked value(i); tests pin window-relative reads and edge throw past a valid backing index"
+   "Vector nulls: BitSet nullIndices (absolute array-index convention, pinned by window test), isNull(i) bounds-checked, value(i) at null slot returns unobservable junk; tests pin the differing-junk/gated-read-identical invariant"
+   "RecordBatch: schema + vectors, constructor checks width/type-agreement/equal-lengths in that order, rowCount derived, vector(name) via schema position; tests pin boundary-invisibility over windowed slices of shared arrays"
+   "Expr AST: sealed interface (ColumnRef, typed Literal records, BinaryExpr/UnaryExpr/LogicalExpr), outputType(Schema) recursive type rules with deliberate mixed-width rejection, collectReferences, and TypeMismatchException with operand/operator details"
+   "QE-06 completion: expression = per-row scalar function (never changes row count); operator = relation-to-relation (row count/schema changes); distinction articulated"
+   "qe.07 semantics settled before code: expression = map (8->8), filter operator = filter (8->5), aggregate = fold (8->1); comparison/arithmetic validity = AND of input validities; AND/OR need three-valued logic with a dominant value (false dominates AND, true dominates OR) so those kernels must read values even at invalid slots"]
   :current-design ["Type as sealed interface chosen over enum for future nested types; Schema stores LinkedHashMap name->field; Vector contract mechanism-free; nulls are data not holes; batch boundaries are execution detail; Expr type rules reject mixed widths deliberately (INT32+INT64 rejected until a query forces coercion)"]
   :known-correctness-gaps
   ["RecordBatch.vectors() returns mutable internal array (encapsulation pass pending)"
-   "Vector.validateWindow uses reflective Array.getLength on every construction (perf-only, parked)"
    "Record accessors values()/nullIndices() leak internals; hiding nullIndices() would make BitSet indexing convention an internal detail (encapsulation deferred)"
    "SQL 3VL (null > 5 etc.) — central to qe.07 evaluation semantics"]]
   :known-performance-gaps []}
@@ -357,8 +357,9 @@ The block between BEGIN_MUTABLE_STATE and END_MUTABLE_STATE is rewritten in plac
   {:id "D-002" :decision "Start with simple Java heap-backed column vectors rather than Arrow Java." :reason "Learn query-engine abstractions before production memory machinery."}
   {:id "D-003" :decision "Use a hybrid Parquet path: educational byte-level reader/labs, then a production-capable Java Parquet library." :reason "Understand Parquet without making format completeness the whole course."}
   {:id "D-004" :decision "Introduce SQL late and use Apache Calcite for parsing/validation/SQL-to-relational machinery." :reason "Learner implements query engine rather than spending course on SQL grammar."}
-  {:id "D-005" :decision "Tutor does not provide implementation code by default." :reason "Learner writes engine; tutor explains, probes, reviews, and escalates hints."}]
- :next-action "qe.07 (completes milestone M0): batch expression evaluation — eval Expr over RecordBatch -> Vector of same length; probes — inputs/outputs for trip_distance > 5 over 8 values, and null slot semantics (SQL 3VL: null > 5 is not false, it is null). Literal/ColumnRef may be views instead of materialized vectors."}
+  {:id "D-005" :decision "Tutor does not provide implementation code by default." :reason "Learner writes engine; tutor explains, probes, reviews, and escalates hints."}
+  {:id "D-006" :decision "Literals evaluate to a length-carrying Scalar Vector variant that may escape the evaluator (option A); consumers switch on it." :reason "Avoids a 65KB filled array per batch per literal; sealed Vector makes the compiler flag every consumer that must handle it."}]
+ :next-action "qe.07 build: implement Vector eval(Expr, RecordBatch). Leaves first (ColumnRef by name, Literal -> Scalar variant), then comparison and arithmetic kernels, then AND/OR. Scalar carries a fresh empty BitSet and isNull is always false; a NULL literal later becomes one more field rather than a new variant."
 #+end_src
 # END_MUTABLE_STATE
 

@@ -1,25 +1,26 @@
 package org.kogu.queryEngine.types;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-
+import java.util.BitSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
 import org.junit.jupiter.api.Test;
+import org.kogu.queryEngine.types.Expr.*;
+import org.kogu.queryEngine.types.Type.Scalar;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 class ExprTest {
 
     @Test
     void columnReferenceResolvesTypeAndCollectsItsName() {
-        Expr.ColumnRef column = new Expr.ColumnRef("fare_amount");
+        ColumnRef column = new ColumnRef("fare_amount");
         Schema schema = Schema.from(List.of(
-                new Field("fare_amount", Type.Scalar.INT64, false)));
+                new Field("fare_amount", Scalar.INT64, false)));
         Set<String> references = new LinkedHashSet<>();
 
-        assertEquals(Type.Scalar.INT64, column.outputType(schema));
+        assertEquals(Scalar.INT64, column.outputType(schema));
         column.collectReferences(references);
         assertEquals(Set.of("fare_amount"), references);
     }
@@ -28,38 +29,37 @@ class ExprTest {
     void everyLiteralReportsItsScalarType() {
         Schema schema = Schema.from(List.of());
 
-        assertEquals(Type.Scalar.INT32, new Expr.Literal.Int32(1).outputType(schema));
-        assertEquals(Type.Scalar.INT64, new Expr.Literal.Int64(1L).outputType(schema));
-        assertEquals(Type.Scalar.FLOAT64, new Expr.Literal.Float64(1.0).outputType(schema));
-        assertEquals(Type.Scalar.UTF8, new Expr.Literal.Str("one").outputType(schema));
-        assertEquals(Type.Scalar.BOOLEAN, Expr.Literal.Bool.True.outputType(schema));
+        assertEquals(Scalar.INT32, new Literal.Int32(1).outputType(schema));
+        assertEquals(Scalar.INT64, new Literal.Int64(1L).outputType(schema));
+        assertEquals(Scalar.FLOAT64, new Literal.Float64(1.0).outputType(schema));
+        assertEquals(Scalar.UTF8, new Literal.Str("one").outputType(schema));
+        assertEquals(Scalar.BOOLEAN, Literal.Bool.True.outputType(schema));
     }
 
     @Test
     void comparisonOperatorsAcceptMatchingTypesAndReturnBoolean() {
         Schema schema = Schema.from(List.of());
-        Expr left = new Expr.Literal.Int32(1);
-        Expr right = new Expr.Literal.Int32(2);
+        Expr left = new Literal.Int32(1);
+        Expr right = new Literal.Int32(2);
 
         for (Expr.BinaryOp op : List.of(
-                Expr.BinaryOp.EqualEqual,
-                Expr.BinaryOp.NotEqual,
-                Expr.BinaryOp.Less,
-                Expr.BinaryOp.LessEqual,
-                Expr.BinaryOp.Greater,
-                Expr.BinaryOp.GreaterEqual)) {
-            assertEquals(Type.Scalar.BOOLEAN,
-                    new Expr.BinaryExpr(op, left, right).outputType(schema));
+                ComparisionOps.EqEq,
+                ComparisionOps.NEq,
+                ComparisionOps.LT,
+                ComparisionOps.LTEq,
+                ComparisionOps.GT,
+                ComparisionOps.GTEq)) {
+            assertEquals(Scalar.BOOLEAN,
+                    new BinaryExpr(left, op, right).outputType(schema));
         }
     }
 
     @Test
     void rejectsComparisonOfDifferentTypesWithOperandDetails() {
         Schema schema = Schema.from(List.of());
-        Expr.BinaryExpr expression = new Expr.BinaryExpr(
-                Expr.BinaryOp.EqualEqual,
-                new Expr.Literal.Int32(1),
-                new Expr.Literal.Int64(1L));
+        BinaryExpr expression = new BinaryExpr(
+                new Literal.Int32(1), ComparisionOps.EqEq,
+                new Literal.Int64(1L));
 
         Expr.TypeMismatchException error = assertThrows(
                 Expr.TypeMismatchException.class,
@@ -72,23 +72,22 @@ class ExprTest {
     @Test
     void arithmeticSupportsNumericTypesAndRejectsOtherTypes() {
         Schema schema = Schema.from(List.of());
-        for (Type.Scalar type : List.of(Type.Scalar.INT32, Type.Scalar.INT64, Type.Scalar.FLOAT64)) {
+        for (Scalar type : List.of(Scalar.INT32, Scalar.INT64, Scalar.FLOAT64)) {
             Expr literal = switch (type) {
-                case INT32 -> new Expr.Literal.Int32(1);
-                case INT64 -> new Expr.Literal.Int64(1L);
-                case FLOAT64 -> new Expr.Literal.Float64(1.0);
+                case INT32 -> new Literal.Int32(1);
+                case INT64 -> new Literal.Int64(1L);
+                case FLOAT64 -> new Literal.Float64(1.0);
                 default -> throw new AssertionError(type);
             };
             assertEquals(type,
-                    new Expr.BinaryExpr(Expr.BinaryOp.Plus, literal, literal).outputType(schema));
+                    new BinaryExpr(literal, ArithmeticOps.Add, literal).outputType(schema));
         }
 
         Expr.TypeMismatchException error = assertThrows(
                 Expr.TypeMismatchException.class,
-                () -> new Expr.BinaryExpr(
-                        Expr.BinaryOp.Plus,
-                        new Expr.Literal.Str("a"),
-                        new Expr.Literal.Str("b")).outputType(schema));
+                () -> new BinaryExpr(
+                        new Literal.Str("a"), ArithmeticOps.Add,
+                        new Literal.Str("b")).outputType(schema));
         assertEquals("Cannot apply + to operands: left type UTF8, right type UTF8",
                 error.getMessage());
     }
@@ -96,23 +95,23 @@ class ExprTest {
     @Test
     void unaryAndLogicalOperatorsRequireBooleanOperands() {
         Schema schema = Schema.from(List.of());
-        Expr bool = Expr.Literal.Bool.True;
+        Expr bool = Literal.Bool.True;
 
-        assertEquals(Type.Scalar.BOOLEAN,
-                new Expr.UnaryExpr(Expr.UnaryOp.NOT, bool).outputType(schema));
-        assertEquals(Type.Scalar.BOOLEAN,
-                new Expr.LogicalExpr(Expr.LogicalOp.AND, bool, bool).outputType(schema));
+        assertEquals(Scalar.BOOLEAN,
+                new Expr.UnaryExpr(UnaryOp.NOT, bool).outputType(schema));
+        assertEquals(Scalar.BOOLEAN,
+                new Expr.LogicalExpr(bool, LogicalOp.AND, bool).outputType(schema));
 
         Expr.TypeMismatchException unaryError = assertThrows(
                 Expr.TypeMismatchException.class,
-                () -> new Expr.UnaryExpr(Expr.UnaryOp.NOT, new Expr.Literal.Int32(1))
+                () -> new Expr.UnaryExpr(UnaryOp.NOT, new Literal.Int32(1))
                         .outputType(schema));
         assertEquals("Cannot apply NOT: operand type INT32, expected BOOLEAN", unaryError.getMessage());
 
         Expr.TypeMismatchException logicalError = assertThrows(
                 Expr.TypeMismatchException.class,
                 () -> new Expr.LogicalExpr(
-                        Expr.LogicalOp.OR, bool, new Expr.Literal.Int32(1)).outputType(schema));
+                        bool, LogicalOp.OR, new Literal.Int32(1)).outputType(schema));
         assertEquals("Cannot apply OR: left type BOOLEAN, right type INT32, expected BOOLEAN operands",
                 logicalError.getMessage());
     }
@@ -120,15 +119,12 @@ class ExprTest {
     @Test
     void nestedExpressionsCollectDistinctReferences() {
         Expr expression = new Expr.LogicalExpr(
-                Expr.LogicalOp.AND,
-                new Expr.BinaryExpr(
-                        Expr.BinaryOp.Greater,
-                        new Expr.ColumnRef("fare_amount"),
-                        new Expr.Literal.Int32(5)),
-                new Expr.BinaryExpr(
-                        Expr.BinaryOp.Less,
-                        new Expr.ColumnRef("fare_amount"),
-                        new Expr.ColumnRef("trip_distance")));
+                new BinaryExpr(
+                        new ColumnRef("fare_amount"), ComparisionOps.GT,
+                        new Literal.Int32(5)), LogicalOp.AND,
+                new BinaryExpr(
+                        new ColumnRef("fare_amount"), ComparisionOps.LT,
+                        new ColumnRef("trip_distance")));
         Set<String> references = new LinkedHashSet<>();
 
         expression.collectReferences(references);
@@ -138,7 +134,7 @@ class ExprTest {
 
     @Test
     void missingColumnReportsItsName() {
-        Expr.ColumnRef column = new Expr.ColumnRef("missing");
+        ColumnRef column = new ColumnRef("missing");
         Schema schema = Schema.from(List.of());
 
         IllegalArgumentException error = assertThrows(
@@ -148,4 +144,5 @@ class ExprTest {
         assertInstanceOf(IllegalArgumentException.class, error);
         assertEquals("Field not found: missing in schema: []", error.getMessage());
     }
+
 }

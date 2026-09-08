@@ -3,12 +3,6 @@ package org.kogu.queryEngine.types;
 import java.util.Set;
 
 sealed interface Expr {
-    final class TypeMismatchException extends IllegalArgumentException {
-        TypeMismatchException(String message) {
-            super(message);
-        }
-    }
-
     /// The type this expression produces once column names are looked up in schema.
     /// Throws if a name is missing or a type combination is illegal.
     Type.Scalar outputType(Schema schema);
@@ -79,33 +73,29 @@ sealed interface Expr {
         }
     }
 
-    record BinaryExpr(BinaryOp op, Expr left, Expr right) implements Expr {
+    record BinaryExpr(Expr left, BinaryOp op, Expr right) implements Expr {
         @Override
         public Type.Scalar outputType(Schema schema) {
             Type.Scalar leftType = left.outputType(schema);
             Type.Scalar rightType = right.outputType(schema);
             return switch (op) {
-                case EqualEqual, NotEqual, Less, LessEqual, Greater, GreaterEqual -> {
-                    if (leftType != rightType) {
+                case ComparisionOps _ -> {
+                    if (leftType != rightType)
                         throw new TypeMismatchException(
-                                "Cannot compare operands for %s: left type %s, right type %s"
-                                        .formatted(op.token, leftType, rightType));
-                    }
+                            "Cannot compare operands for %s: left type %s, right type %s"
+                                    .formatted(op.token(), leftType, rightType));
                     yield Type.Scalar.BOOLEAN;
                 }
-                case Minus, Plus, Div, Multiply -> {
+                case ArithmeticOps _ -> {
                     if (leftType == rightType) {
                         switch (leftType) {
-                            case INT32, INT64, FLOAT64 -> {
-                                yield leftType;
-                            }
-                            default -> {
-                            }
+                            case INT32, INT64, FLOAT64 -> {yield leftType;}
+                            case BOOLEAN, UTF8 -> {}
                         }
                     }
                     throw new TypeMismatchException(
                             "Cannot apply %s to operands: left type %s, right type %s"
-                                    .formatted(op.token, leftType, rightType));
+                                    .formatted(op.token(), leftType, rightType));
                 }
             };
         }
@@ -136,7 +126,7 @@ sealed interface Expr {
         }
     }
 
-    record LogicalExpr(LogicalOp op, Expr left, Expr right) implements Expr {
+    record LogicalExpr(Expr left, LogicalOp op, Expr right) implements Expr {
         @Override
         public Type.Scalar outputType(Schema schema) {
             Type.Scalar leftType = left.outputType(schema);
@@ -159,24 +149,39 @@ sealed interface Expr {
 
     enum UnaryOp {NOT}
 
-    enum BinaryOp {
-        EqualEqual("=="),
-        NotEqual("!="),
-        Less("<"),
-        LessEqual("<="),
-        Greater(">"),
-        GreaterEqual(">="),
-        Minus("-"),
-        Plus("+"),
-        Div("/"),
+    sealed interface BinaryOp {
+        String token();
+    }
+
+    enum ArithmeticOps implements BinaryOp {
+        Subtract("-"),
+        Add("+"),
+        Divide("/"),
         Multiply("*");
 
         public final String token;
+        ArithmeticOps(String token) {this.token = token;}
+        @Override public String token() {return token;}
+    }
 
-        BinaryOp(String token) {
-            this.token = token;
-        }
+    enum ComparisionOps implements BinaryOp {
+        EqEq("=="),
+        NEq("!="),
+        LT("<"),
+        LTEq("<="),
+        GT(">"),
+        GTEq(">=");
+
+        public final String token;
+        ComparisionOps(String token) {this.token = token;}
+        @Override public String token() {return token;}
     }
 
     enum LogicalOp {AND, OR}
+
+    final class TypeMismatchException extends IllegalArgumentException {
+        TypeMismatchException(String message) {
+            super(message);
+        }
+    }
 }
