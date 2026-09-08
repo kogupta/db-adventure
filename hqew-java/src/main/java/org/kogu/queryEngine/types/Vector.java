@@ -7,8 +7,6 @@ import static org.kogu.queryEngine.types.Vector.*;
 
 public sealed interface Vector permits
         BoolVec, DoubleVec, IntVec, LongVec, Utf8Vec {
-    int offset();
-
     int length();
 
     Type.Scalar type();
@@ -61,40 +59,37 @@ public sealed interface Vector permits
         public DoubleVector {
             Objects.requireNonNull(values, "values");
             Objects.requireNonNull(nullIndices, "nullIndices");
-            positiveLength(length);
-            validateWindow(offset, length, values.length);
+            Vector.positiveLength(length);
+            Vector.validateWindow(offset, length, values.length);
         }
 
         @Override
         public double value(int index) {
-            validateIndex(index, length);
+            Vector.validateIndex(index, length);
             return values[offset + index];
         }
 
         @Override
         public boolean isNull(int index) {
-            validateIndex(index, length);
+            Vector.validateIndex(index, length);
             return nullIndices.get(offset + index);
         }
     }
 
     record ConstantDouble(double n, int length) implements DoubleVec {
         public ConstantDouble {
-            positiveLength(length);
+            Vector.positiveLength(length);
         }
 
         @Override
         public double value(int index) {
-            validateIndex(index, length);
+            Vector.validateIndex(index, length);
             return n;
         }
 
         @Override
-        public int offset() {return 0;}
-
-        @Override
         public boolean isNull(int index) {
-            validateIndex(index, length);
+            Vector.validateIndex(index, length);
             return false;
         }
     }
@@ -104,18 +99,18 @@ public sealed interface Vector permits
         public IntVector {
             Objects.requireNonNull(values, "values");
             Objects.requireNonNull(nullIndices, "nullIndices");
-            positiveLength(length);
-            validateWindow(offset, length, values.length);
+            Vector.positiveLength(length);
+            Vector.validateWindow(offset, length, values.length);
         }
 
         public int value(int index) {
-            validateIndex(index, length);
+            Vector.validateIndex(index, length);
             return values[offset + index];
         }
 
         @Override
         public boolean isNull(int index) {
-            validateIndex(index, length);
+            Vector.validateIndex(index, length);
             return nullIndices.get(offset + index);
         }
 
@@ -126,18 +121,18 @@ public sealed interface Vector permits
         public LongVector {
             Objects.requireNonNull(values, "values");
             Objects.requireNonNull(nullIndices, "nullIndices");
-            positiveLength(length);
-            validateWindow(offset, length, values.length);
+            Vector.positiveLength(length);
+            Vector.validateWindow(offset, length, values.length);
         }
 
         public long value(int index) {
-            validateIndex(index, length);
+            Vector.validateIndex(index, length);
             return values[offset + index];
         }
 
         @Override
         public boolean isNull(int index) {
-            validateIndex(index, length);
+            Vector.validateIndex(index, length);
             return nullIndices.get(offset + index);
         }
 
@@ -148,18 +143,18 @@ public sealed interface Vector permits
         public StringVector {
             Objects.requireNonNull(values, "values");
             Objects.requireNonNull(nullIndices, "nullIndices");
-            positiveLength(length);
-            validateWindow(offset, length, values.length);
+            Vector.positiveLength(length);
+            Vector.validateWindow(offset, length, values.length);
         }
 
         public String value(int index) {
-            validateIndex(index, length);
+            Vector.validateIndex(index, length);
             return values[offset + index];
         }
 
         @Override
         public boolean isNull(int index) {
-            validateIndex(index, length);
+            Vector.validateIndex(index, length);
             return nullIndices.get(offset + index);
         }
 
@@ -170,22 +165,18 @@ public sealed interface Vector permits
         public BooleanVector {
             Objects.requireNonNull(values, "values");
             Objects.requireNonNull(nullIndices, "nullIndices");
-            positiveLength(length);
-            validateWindow(offset, length, values.length);
-        }
-
-        public BooleanVector(boolean[] values, BitSet nullIndices) {
-            this(values, 0, values.length, nullIndices);
+            Vector.positiveLength(length);
+            Vector.validateWindow(offset, length, values.length);
         }
 
         public boolean value(int index) {
-            validateIndex(index, length);
+            Vector.validateIndex(index, length);
             return values[offset + index];
         }
 
         @Override
         public boolean isNull(int index) {
-            validateIndex(index, length);
+            Vector.validateIndex(index, length);
             return nullIndices.get(offset + index);
         }
 
@@ -193,97 +184,85 @@ public sealed interface Vector permits
 
     record ConstantInt(int n, int length) implements IntVec {
         public ConstantInt {
-            positiveLength(length);
+            Vector.positiveLength(length);
         }
 
         @Override
-        public int offset() {return 0;}
-
-        @Override
         public boolean isNull(int index) {
-            validateIndex(index, length());
+            Vector.validateIndex(index, length());
             return false;
         }
 
         public int value(int index) {
-            validateIndex(index, length);
+            Vector.validateIndex(index, length);
             return n;
         }
     }
 
     record ConstantLong(long n, int length) implements LongVec {
         public ConstantLong {
-            positiveLength(length);
+            Vector.positiveLength(length);
         }
 
         @Override
-        public int offset() {return 0;}
-
-        @Override
         public boolean isNull(int index) {
-            validateIndex(index, length);
+            Vector.validateIndex(index, length);
             return false;
         }
 
         public long value(int index) {
-            validateIndex(index, length);
+            Vector.validateIndex(index, length);
             return n;
         }
     }
 
     record ConstantBool(boolean value, int length) implements BoolVec {
         public ConstantBool {
-            positiveLength(length);
+            Vector.positiveLength(length);
         }
 
         @Override
-        public int offset() {return 0;}
-
-        @Override
         public boolean isNull(int index) {
-            validateIndex(index, length);
+            Vector.validateIndex(index, length);
             return false;
         }
 
         public boolean value(int index) {
-            validateIndex(index, length);
+            Vector.validateIndex(index, length);
             return value;
         }
     }
 
     record ConstantUtf8(String s, int length) implements Utf8Vec {
         public ConstantUtf8 {
-            positiveLength(length);
+            Vector.positiveLength(length);
         }
 
         @Override
-        public int offset() {return 0;}
-
-        @Override
         public boolean isNull(int index) {
-            validateIndex(index, length);
+            Vector.validateIndex(index, length);
             return false;
         }
 
         public String value(int index) {
-            validateIndex(index, length);
+            Vector.validateIndex(index, length);
             return s;
         }
     }
 
-    static void validateWindow(int offset, int length, int arrayLength) {
+    private static void validateWindow(int offset, int length, int arrayLength) {
         if (offset < 0 || length < 0 || offset > arrayLength || length > arrayLength - offset) {
             throw new IndexOutOfBoundsException();
         }
     }
 
-    static void validateIndex(int index, int length) {
+    private static void validateIndex(int index, int length) {
         if (index < 0 || index >= length) {
             throw new IndexOutOfBoundsException();
         }
     }
 
-    static void positiveLength(int n) {
+    private static void positiveLength(int n) {
         if (n < 0) throw new IllegalArgumentException("Length must be >= 0");
     }
 }

@@ -1,9 +1,11 @@
 package org.kogu.queryEngine.types;
 
 import org.kogu.queryEngine.types.Expr.Literal;
+import org.kogu.queryEngine.types.Expr.LogicalOp;
 
 import java.util.BitSet;
-import java.util.Objects;
+import java.util.function.IntConsumer;
+import java.util.function.IntPredicate;
 
 import static org.kogu.queryEngine.types.Vector.*;
 
@@ -21,16 +23,16 @@ final class ExprEvaluator {
             case Expr.BinaryExpr(var left, var op, var right) -> {
                 Vector a = eval(left, batch);
                 Vector b = eval(right, batch);
-                switch (op) {
-                    case Expr.ArithmeticOps o -> numeric(a, o, b);
-                    case Expr.ComparisionOps o -> compare(a, o, b);
-                }
+                yield switch (op) {
+                    case ArithmeticOps o -> numeric(a, o, b);
+                    case ComparisionOps o -> compare(a, o, b);
+                };
             }
             case Expr.UnaryExpr(var op, Expr e) -> evalUnary(batch, op, e);
             case Expr.LogicalExpr(var left, var op, var right) -> {
                 Vector a = eval(left, batch);
                 Vector b = eval(right, batch);
-                if (!(a instanceof BooleanVector l) || !(b instanceof BooleanVector r))
+                if (!(a instanceof BoolVec l) || !(b instanceof BoolVec r))
                     throw new Expr.TypeMismatchException("Logical requires boolean operands");
 
                 yield evalLogical(batch, op, l, r);
@@ -38,8 +40,8 @@ final class ExprEvaluator {
         };
     }
 
-    private static BooleanVector evalLogical(RecordBatch batch, Expr.LogicalOp op, BooleanVector left,
-                                             BooleanVector right) {
+    private static BooleanVector evalLogical(RecordBatch batch, LogicalOp op, BoolVec left,
+                                             BoolVec right) {
         boolean[] result = new boolean[batch.rowCount()];
         BitSet nulls = new BitSet(batch.rowCount());
 
@@ -50,23 +52,22 @@ final class ExprEvaluator {
                     case OR -> left.value(i) || right.value(i);
                 };
             else if (left.isNotNull(i)) {
-                evalBoolsNulls(op, left, i, result, nulls);
+                evalBoolNulls(op, left, i, result, nulls);
             } else if (right.isNotNull(i)) {
-                // right is non null
-                evalBoolsNulls(op, right, i, result, nulls);
+                evalBoolNulls(op, right, i, result, nulls);
             } else {
                 nulls.set(i);
             }
         }
 
-        return new BooleanVector(result, nulls);
+        return Vectors.booleanVector(result, nulls);
     }
 
-    private static void evalBoolsNulls(Expr.LogicalOp op, BooleanVector vector, int index, boolean[] result,
-                                       BitSet nulls) {
-        if (vector.value(index) && op == Expr.LogicalOp.OR)
+    private static void evalBoolNulls(LogicalOp op, BoolVec vector, int index,
+                                      boolean[] result, BitSet nulls) {
+        if (vector.value(index) && op == LogicalOp.OR)
             result[index] = true;
-        else if (!vector.value(index) && op == Expr.LogicalOp.AND)
+        else if (!vector.value(index) && op == LogicalOp.AND)
             result[index] = false;
         else
             nulls.set(index);
@@ -75,29 +76,139 @@ final class ExprEvaluator {
     private static BooleanVector evalUnary(RecordBatch batch, Expr.UnaryOp op, Expr e) {
         Vector v = eval(e, batch);
 
-        if (!(v instanceof BooleanVector bs) || op != Expr.UnaryOp.NOT) {
+        if (!(v instanceof BoolVec bs) || op != Expr.UnaryOp.NOT) {
             throw new IllegalArgumentException("Unsupported unary operation");
         }
 
         boolean[] result = new boolean[batch.rowCount()];
+        BitSet nulls = new BitSet(batch.rowCount());
         for (int i = 0; i < batch.rowCount(); i++) {
-            if (!bs.isNull(i))
+            if (bs.isNotNull(i))
                 result[i] = !bs.value(i);
+            else
+                nulls.set(i);
         }
-        BitSet nulls = bs.nullIndices().get(bs.offset(), bs.offset() + bs.length());
-        return new BooleanVector(result, nulls);
+
+        return Vectors.booleanVector(result, nulls);
     }
 
-    static Vector numeric(Vector left, Expr.ArithmeticOps op, Vector right) {
-        // TODO: allocate result vector
-        //      iterate over both vectors using indices and apply op
-        //      iterate by indices, should check `isNull`
+    static Vector numeric(Vector left, ArithmeticOps op, Vector right) {
+        validateSameLength(left, right);
+        return switch (left) {
+            case IntVec l when right instanceof IntVec r -> numericInts(l, op, r);
+            case LongVec l when right instanceof LongVec r -> numericLongs(l, op, r);
+            case DoubleVec l when right instanceof DoubleVec r -> numericDoubles(l, op, r);
+            default -> throw new Expr.TypeMismatchException(
+                    "Cannot apply %s to operands: left type %s, right type %s"
+                            .formatted(op.token(), left.type(), right.type()));
+        };
     }
 
-    static Vector compare(Vector left, Expr.ComparisionOps op, Vector right) {
-        // TODO: allocate result vector
-        //      iterate over both vectors using indices and apply op
-        //      iterate by indices, should check `isNull`
+    static Vector compare(Vector left, ComparisionOps op, Vector right) {
+        validateSameLength(left, right);
+        return switch (left) {
+            case IntVec l when right instanceof IntVec r -> compareInts(l, op, r);
+            case LongVec l when right instanceof LongVec r -> compareLongs(l, op, r);
+            case DoubleVec l when right instanceof DoubleVec r -> compareDoubles(l, op, r);
+            case BoolVec l when right instanceof BoolVec r -> compareBools(l, op, r);
+            case Utf8Vec l when right instanceof Utf8Vec r -> compareUtf8(l, op, r);
+            default -> throw new Expr.TypeMismatchException(
+                    "Cannot compare operands for %s: left type %s, right type %s"
+                            .formatted(op.token(), left.type(), right.type()));
+        };
+    }
+
+    /// ----- nearly identical methods ----
+    private static IntVector numericInts(IntVec left, ArithmeticOps op, IntVec right) {
+        int[] result = new int[left.length()];
+        BitSet nulls = perSlot(
+                i -> left.isNotNull(i) && right.isNotNull(i),
+                i -> result[i] = op.apply(left.value(i), right.value(i)),
+                left.length());
+        return Vectors.intVector(result, nulls);
+    }
+
+    private static LongVector numericLongs(LongVec left, ArithmeticOps op, LongVec right) {
+        long[] result = new long[left.length()];
+        BitSet nulls = perSlot(
+                i -> left.isNotNull(i) && right.isNotNull(i),
+                i -> result[i] = op.apply(left.value(i), right.value(i)),
+                left.length());
+        return Vectors.longVector(result, nulls);
+    }
+
+    private static DoubleVector numericDoubles(DoubleVec left, ArithmeticOps op, DoubleVec right) {
+        double[] result = new double[left.length()];
+        BitSet nulls = perSlot(
+                i -> left.isNotNull(i) && right.isNotNull(i),
+                i -> result[i] = op.apply(left.value(i), right.value(i)),
+                left.length());
+        return Vectors.doubleVector(result, nulls);
+    }
+
+    /// Runs writeSlot at every slot where bothNonNull holds. Sets the null bit at the rest.
+    /// Slots left unwritten keep the array default, which is unobservable behind the null bit.
+    private static BitSet perSlot(IntPredicate bothNonNull, IntConsumer writeSlot, int length) {
+        BitSet nulls = new BitSet(length);
+        for (int i = 0; i < length; i++) {
+            if (bothNonNull.test(i))
+                writeSlot.accept(i);
+            else
+                nulls.set(i);
+        }
+        return nulls;
+    }
+
+    /// One kernel per element type. int[]/long[]/double[] share no supertype, and a common
+    /// signature would box every slot, so the repetition stays.
+    private static BooleanVector compareInts(IntVec left, ComparisionOps op, IntVec right) {
+        boolean[] result = new boolean[left.length()];
+        BitSet nulls = perSlot(
+                i -> left.isNotNull(i) && right.isNotNull(i),
+                i -> result[i] = op.compare(left.value(i), right.value(i)),
+                left.length());
+        return Vectors.booleanVector(result, nulls);
+    }
+
+    private static BooleanVector compareLongs(LongVec left, ComparisionOps op, LongVec right) {
+        boolean[] result = new boolean[left.length()];
+        BitSet nulls = perSlot(
+                i -> left.isNotNull(i) && right.isNotNull(i),
+                i -> result[i] = op.compare(left.value(i), right.value(i)),
+                left.length());
+        return Vectors.booleanVector(result, nulls);
+    }
+
+    private static BooleanVector compareDoubles(DoubleVec left, ComparisionOps op, DoubleVec right) {
+        boolean[] result = new boolean[left.length()];
+        BitSet nulls = perSlot(
+                i -> left.isNotNull(i) && right.isNotNull(i),
+                i -> result[i] = op.compare(left.value(i), right.value(i)),
+                left.length());
+        return Vectors.booleanVector(result, nulls);
+    }
+
+    private static BooleanVector compareBools(BoolVec left, ComparisionOps op, BoolVec right) {
+        boolean[] result = new boolean[left.length()];
+        BitSet nulls = perSlot(
+                i -> left.isNotNull(i) && right.isNotNull(i),
+                i -> result[i] = op.compare(left.value(i), right.value(i)),
+                left.length());
+        return Vectors.booleanVector(result, nulls);
+    }
+
+    private static BooleanVector compareUtf8(Utf8Vec left, ComparisionOps op, Utf8Vec right) {
+        boolean[] result = new boolean[left.length()];
+        BitSet nulls = perSlot(
+                i -> left.isNotNull(i) && right.isNotNull(i),
+                i -> result[i] = op.compare(left.value(i), right.value(i)),
+                left.length());
+        return Vectors.booleanVector(result, nulls);
+    }
+
+    private static void validateSameLength(Vector left, Vector right) {
+        if (left.length() != right.length())
+            throw new IllegalArgumentException("Vector lengths do not match");
     }
 
 }

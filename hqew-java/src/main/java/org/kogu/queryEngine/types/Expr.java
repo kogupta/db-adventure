@@ -149,32 +149,8 @@ sealed interface Expr {
 
     enum UnaryOp {NOT}
 
-    sealed interface BinaryOp {
+    sealed interface BinaryOp permits ArithmeticOps, ComparisionOps {
         String token();
-    }
-
-    enum ArithmeticOps implements BinaryOp {
-        Subtract("-"),
-        Add("+"),
-        Divide("/"),
-        Multiply("*");
-
-        public final String token;
-        ArithmeticOps(String token) {this.token = token;}
-        @Override public String token() {return token;}
-    }
-
-    enum ComparisionOps implements BinaryOp {
-        EqEq("=="),
-        NEq("!="),
-        LT("<"),
-        LTEq("<="),
-        GT(">"),
-        GTEq(">=");
-
-        public final String token;
-        ComparisionOps(String token) {this.token = token;}
-        @Override public String token() {return token;}
     }
 
     enum LogicalOp {AND, OR}

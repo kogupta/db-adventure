@@ -344,13 +344,17 @@ The block between BEGIN_MUTABLE_STATE and END_MUTABLE_STATE is rewritten in plac
    "RecordBatch: schema + vectors, constructor checks width/type-agreement/equal-lengths in that order, rowCount derived, vector(name) via schema position; tests pin boundary-invisibility over windowed slices of shared arrays"
    "Expr AST: sealed interface (ColumnRef, typed Literal records, BinaryExpr/UnaryExpr/LogicalExpr), outputType(Schema) recursive type rules with deliberate mixed-width rejection, collectReferences, and TypeMismatchException with operand/operator details"
    "QE-06 completion: expression = per-row scalar function (never changes row count); operator = relation-to-relation (row count/schema changes); distinction articulated"
-   "qe.07 semantics settled before code: expression = map (8->8), filter operator = filter (8->5), aggregate = fold (8->1); comparison/arithmetic validity = AND of input validities; AND/OR need three-valued logic with a dominant value (false dominates AND, true dominates OR) so those kernels must read values even at invalid slots"]
+   "qe.07 semantics settled before code: expression = map (8->8), filter operator = filter (8->5), aggregate = fold (8->1); comparison/arithmetic validity = AND of input validities; AND/OR need three-valued logic with a dominant value (false dominates AND, true dominates OR) so those kernels must read values even at invalid slots"
+   "Vector is now a 3-level hierarchy: Vector (sealed) -> element-type interfaces IntVec/LongVec/DoubleVec/BoolVec/Utf8Vec (each declares value(int) and a default type()) -> storage records (windowed array vector, or Constant* with no BitSet). Kernels name element type only, so constant-vs-windowed storage never reaches a switch arm. offset() and nullIndices() are off the interface; isNull(int) is the whole null contract"
+   "ExprEvaluator: static eval(Expr, RecordBatch) -> Vector. ColumnRef returns the batch vector unchanged, literals build Constant*, arithmetic/comparison dispatch one arm per element type, 3VL AND/OR/NOT correct including the both-null case; kernels share a perSlot(bothNonNull, writeSlot, length) driver"
+   "qe.07 ExprEvaluator tests: pins rowCount preservation across all AST shapes, null propagation with differing-junk invariance on trip_distance > 5, 3VL short-circuit (false AND null / true OR null), boundary invisibility (8-row batch vs 3+3+2 concatenated), and mixed-type rejection (TypeMismatchException)"]
   :current-design ["Type as sealed interface chosen over enum for future nested types; Schema stores LinkedHashMap name->field; Vector contract mechanism-free; nulls are data not holes; batch boundaries are execution detail; Expr type rules reject mixed widths deliberately (INT32+INT64 rejected until a query forces coercion)"]
   :known-correctness-gaps
   ["RecordBatch.vectors() returns mutable internal array (encapsulation pass pending)"
-   "Record accessors values()/nullIndices() leak internals; hiding nullIndices() would make BitSet indexing convention an internal detail (encapsulation deferred)"
-   "SQL 3VL (null > 5 etc.) — central to qe.07 evaluation semantics"]]
-  :known-performance-gaps []}
+   "Record accessors values()/nullIndices() leak internals; hiding nullIndices() would make BitSet indexing convention an internal detail (encapsulation deferred)"]
+  :known-performance-gaps
+  ["Kernels allocate a fresh result array per batch; production engines reuse an operator-owned output buffer, or write in place when a vector has one reader (DuckDB/Velox refcount). Revisit at qe.35."
+   "perSlot driver puts two lambdas in the inner loop shared by eight kernels, so the call site is megamorphic and stops inlining. Revisit at qe.35."]}
  :open-loops []
  :durable-decisions
  [{:id "D-001" :decision "Use Java rather than Rust." :reason "Keep attention on query-engine machinery rather than language/manual-memory concerns."}
@@ -359,7 +363,7 @@ The block between BEGIN_MUTABLE_STATE and END_MUTABLE_STATE is rewritten in plac
   {:id "D-004" :decision "Introduce SQL late and use Apache Calcite for parsing/validation/SQL-to-relational machinery." :reason "Learner implements query engine rather than spending course on SQL grammar."}
   {:id "D-005" :decision "Tutor does not provide implementation code by default." :reason "Learner writes engine; tutor explains, probes, reviews, and escalates hints."}
   {:id "D-006" :decision "Literals evaluate to a length-carrying Scalar Vector variant that may escape the evaluator (option A); consumers switch on it." :reason "Avoids a 65KB filled array per batch per literal; sealed Vector makes the compiler flag every consumer that must handle it."}]
- :next-action "qe.07 build: implement Vector eval(Expr, RecordBatch). Leaves first (ColumnRef by name, Literal -> Scalar variant), then comparison and arithmetic kernels, then AND/OR. Scalar carries a fresh empty BitSet and isNull is always false; a NULL literal later becomes one more field rather than a new variant."
+ :next-action "qe.07 completion: trace a nested expression over one batch, restate expression against relational operator, mark M0, advance to qe.08.operator-contract. Build notes: JDK 26 required (pom sets release 26); run mvn clean after editing any permits clause, else stale classes throw IncompatibleClassChangeError."}
 #+end_src
 # END_MUTABLE_STATE
 

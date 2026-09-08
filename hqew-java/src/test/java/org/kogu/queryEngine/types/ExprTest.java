@@ -145,4 +145,97 @@ class ExprTest {
         assertEquals("Field not found: missing in schema: []", error.getMessage());
     }
 
+    @Test
+    void evaluatesArithmeticOperationsForIntLongDouble() {
+        BitSet leftNulls = new BitSet();
+        leftNulls.set(0); // index 0 is null in left
+        BitSet rightNulls = new BitSet();
+        rightNulls.set(1); // index 1 is null in right
+
+        // INT32
+        Vector.IntVec intLeft = Vectors.intVector(new int[]{0, 10, 20, 30}, leftNulls);
+        Vector.IntVec intRight = Vectors.intVector(new int[]{5, 0, 4, 3}, rightNulls);
+        Schema intSchema = Schema.from(List.of(
+                new Field("a", Scalar.INT32, true),
+                new Field("b", Scalar.INT32, true)));
+        RecordBatch intBatch = new RecordBatch(intSchema, new Vector[]{intLeft, intRight});
+
+        Vector.IntVector intAdd = (Vector.IntVector) ExprEvaluator.eval(
+                new BinaryExpr(new ColumnRef("a"), ArithmeticOps.Add, new ColumnRef("b")), intBatch);
+        assertTrue(intAdd.isNull(0));
+        assertTrue(intAdd.isNull(1));
+        assertFalse(intAdd.isNull(2));
+        assertEquals(24, intAdd.value(2));
+        assertEquals(33, intAdd.value(3));
+
+        Vector.IntVector intSub = (Vector.IntVector) ExprEvaluator.eval(
+                new BinaryExpr(new ColumnRef("a"), ArithmeticOps.Subtract, new ColumnRef("b")), intBatch);
+        assertEquals(16, intSub.value(2));
+        assertEquals(27, intSub.value(3));
+
+        Vector.IntVector intMul = (Vector.IntVector) ExprEvaluator.eval(
+                new BinaryExpr(new ColumnRef("a"), ArithmeticOps.Multiply, new ColumnRef("b")), intBatch);
+        assertEquals(80, intMul.value(2));
+        assertEquals(90, intMul.value(3));
+
+        Vector.IntVector intDiv = (Vector.IntVector) ExprEvaluator.eval(
+                new BinaryExpr(new ColumnRef("a"), ArithmeticOps.Divide, new ColumnRef("b")), intBatch);
+        assertEquals(5, intDiv.value(2));
+        assertEquals(10, intDiv.value(3));
+
+        // INT64
+        Vector.LongVec longLeft = Vectors.longVector(new long[]{0L, 100L, 200L, 300L}, leftNulls);
+        Vector.LongVec longRight = Vectors.longVector(new long[]{5L, 0L, 4L, 3L}, rightNulls);
+        Schema longSchema = Schema.from(List.of(
+                new Field("a", Scalar.INT64, true),
+                new Field("b", Scalar.INT64, true)));
+        RecordBatch longBatch = new RecordBatch(longSchema, new Vector[]{longLeft, longRight});
+
+        Vector.LongVector longAdd = (Vector.LongVector) ExprEvaluator.eval(
+                new BinaryExpr(new ColumnRef("a"), ArithmeticOps.Add, new ColumnRef("b")), longBatch);
+        assertTrue(longAdd.isNull(0));
+        assertTrue(longAdd.isNull(1));
+        assertEquals(204L, longAdd.value(2));
+        assertEquals(303L, longAdd.value(3));
+
+        Vector.LongVector longSub = (Vector.LongVector) ExprEvaluator.eval(
+                new BinaryExpr(new ColumnRef("a"), ArithmeticOps.Subtract, new ColumnRef("b")), longBatch);
+        assertEquals(196L, longSub.value(2));
+
+        Vector.LongVector longMul = (Vector.LongVector) ExprEvaluator.eval(
+                new BinaryExpr(new ColumnRef("a"), ArithmeticOps.Multiply, new ColumnRef("b")), longBatch);
+        assertEquals(800L, longMul.value(2));
+
+        Vector.LongVector longDiv = (Vector.LongVector) ExprEvaluator.eval(
+                new BinaryExpr(new ColumnRef("a"), ArithmeticOps.Divide, new ColumnRef("b")), longBatch);
+        assertEquals(50L, longDiv.value(2));
+
+        // FLOAT64
+        Vector.DoubleVec doubleLeft = Vectors.doubleVector(new double[]{0.0, 10.0, 20.0, 30.0}, leftNulls);
+        Vector.DoubleVec doubleRight = Vectors.doubleVector(new double[]{5.0, 0.0, 4.0, 3.0}, rightNulls);
+        Schema doubleSchema = Schema.from(List.of(
+                new Field("a", Scalar.FLOAT64, true),
+                new Field("b", Scalar.FLOAT64, true)));
+        RecordBatch doubleBatch = new RecordBatch(doubleSchema, new Vector[]{doubleLeft, doubleRight});
+
+        Vector.DoubleVector doubleAdd = (Vector.DoubleVector) ExprEvaluator.eval(
+                new BinaryExpr(new ColumnRef("a"), ArithmeticOps.Add, new ColumnRef("b")), doubleBatch);
+        assertTrue(doubleAdd.isNull(0));
+        assertTrue(doubleAdd.isNull(1));
+        assertEquals(24.0, doubleAdd.value(2));
+        assertEquals(33.0, doubleAdd.value(3));
+
+        Vector.DoubleVector doubleSub = (Vector.DoubleVector) ExprEvaluator.eval(
+                new BinaryExpr(new ColumnRef("a"), ArithmeticOps.Subtract, new ColumnRef("b")), doubleBatch);
+        assertEquals(16.0, doubleSub.value(2));
+
+        Vector.DoubleVector doubleMul = (Vector.DoubleVector) ExprEvaluator.eval(
+                new BinaryExpr(new ColumnRef("a"), ArithmeticOps.Multiply, new ColumnRef("b")), doubleBatch);
+        assertEquals(80.0, doubleMul.value(2));
+
+        Vector.DoubleVector doubleDiv = (Vector.DoubleVector) ExprEvaluator.eval(
+                new BinaryExpr(new ColumnRef("a"), ArithmeticOps.Divide, new ColumnRef("b")), doubleBatch);
+        assertEquals(5.0, doubleDiv.value(2));
+    }
+
 }
