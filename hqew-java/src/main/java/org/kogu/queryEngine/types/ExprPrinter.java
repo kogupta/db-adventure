@@ -1,0 +1,87 @@
+package org.kogu.queryEngine.types;
+
+import java.util.List;
+import java.util.Objects;
+import org.kogu.queryEngine.types.Expr.*;
+
+public final class ExprPrinter {
+    private ExprPrinter() {}
+
+    /// Renders an expression tree in ASCII box-drawing format without type resolution.
+    public static String printTree(Expr expr) {
+        return printTree(expr, null);
+    }
+
+    /// Renders an expression tree in ASCII box-drawing format, resolving output types
+    /// against the provided schema if non-null.
+    public static String printTree(Expr expr, Schema schema) {
+        Objects.requireNonNull(expr, "expr");
+        StringBuilder sb = new StringBuilder();
+        renderTree(expr, schema, "", "", sb);
+        return sb.toString().stripTrailing();
+    }
+
+    /// Renders an expression in infix / SQL-like string representation.
+    public static String toInfix(Expr expr) {
+        Objects.requireNonNull(expr, "expr");
+        return switch (expr) {
+            case ColumnRef(var name) -> name;
+            case Literal.Int32(var val) -> String.valueOf(val);
+            case Literal.Int64(var val) -> val + "L";
+            case Literal.Float64(var val) -> String.valueOf(val);
+            case Literal.Str(var val) -> "'" + val + "'";
+            case Literal.Bool b -> Boolean.toString(b.value);
+            case BinaryExpr(var left, var op, var right) ->
+                    "(" + toInfix(left) + " " + op.token() + " " + toInfix(right) + ")";
+            case UnaryExpr(var op, var e) ->
+                    "(" + op.name() + " " + toInfix(e) + ")";
+            case LogicalExpr(var left, var op, var right) ->
+                    "(" + toInfix(left) + " " + op.name() + " " + toInfix(right) + ")";
+        };
+    }
+
+    private static void renderTree(Expr expr, Schema schema, String prefix, String childPrefix, StringBuilder sb) {
+        sb.append(prefix).append(formatNode(expr, schema)).append(System.lineSeparator());
+
+        List<Expr> children = getChildren(expr);
+        for (int i = 0; i < children.size(); i++) {
+            boolean isLast = (i == children.size() - 1);
+            String nextPrefix = childPrefix + (isLast ? "└── " : "├── ");
+            String nextChildPrefix = childPrefix + (isLast ? "    " : "│   ");
+            renderTree(children.get(i), schema, nextPrefix, nextChildPrefix, sb);
+        }
+    }
+
+    private static String formatNode(Expr expr, Schema schema) {
+        String base = switch (expr) {
+            case ColumnRef(var name) -> "ColumnRef(" + name + ")";
+            case Literal.Int32(var val) -> "Literal(" + val + ")";
+            case Literal.Int64(var val) -> "Literal(" + val + "L)";
+            case Literal.Float64(var val) -> "Literal(" + val + ")";
+            case Literal.Str(var val) -> "Literal('" + val + "')";
+            case Literal.Bool b -> "Literal(" + b.value + ")";
+            case BinaryExpr(_, var op, _) -> "BinaryExpr(" + op.token() + ")";
+            case UnaryExpr(var op, _) -> "UnaryExpr(" + op.name() + ")";
+            case LogicalExpr(_, var op, _) -> "LogicalExpr(" + op.name() + ")";
+        };
+
+        if (schema != null) {
+            try {
+                Type.Scalar type = expr.outputType(schema);
+                return base + " -> " + type;
+            } catch (Exception e) {
+                return base + " -> [type error: " + e.getMessage() + "]";
+            }
+        }
+        return base;
+    }
+
+    private static List<Expr> getChildren(Expr expr) {
+        return switch (expr) {
+            case ColumnRef _, Literal _ -> List.of();
+            case BinaryExpr(var left, _, var right) -> List.of(left, right);
+            case UnaryExpr(_, var e) -> List.of(e);
+            case LogicalExpr(var left, _, var right) -> List.of(left, right);
+        };
+    }
+}

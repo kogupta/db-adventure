@@ -2,7 +2,7 @@ package org.kogu.queryEngine.types;
 
 import java.util.Set;
 
-sealed interface Expr {
+public sealed interface Expr {
     /// The type this expression produces once column names are looked up in schema.
     /// Throws if a name is missing or a type combination is illegal.
     Type.Scalar outputType(Schema schema);
