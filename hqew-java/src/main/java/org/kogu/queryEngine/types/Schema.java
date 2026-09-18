@@ -46,7 +46,8 @@ public final class Schema {
     }
 
     public int indexOfField(String name) {
-        return fieldIndex.get(field(name));
+        Integer n = fieldIndex.get(field(name));
+        return Objects.requireNonNull(n);
     }
 
     public Field fieldAtIndex(int index) {

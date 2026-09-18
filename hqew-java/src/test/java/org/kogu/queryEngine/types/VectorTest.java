@@ -129,6 +129,7 @@ class VectorTest {
     }
 
     @Test
+    @SuppressWarnings("NullAway")
     void intVectorReportsMessageWhenBackingArrayIsNull() {
         NullPointerException error = assertThrows(
                 NullPointerException.class,

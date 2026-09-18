@@ -72,6 +72,7 @@ class VectorNullBitmapTest {
     }
 
     @Test
+    @SuppressWarnings("NullAway")
     void rejectsNullBitmapAtConstruction() {
         assertThrows(
                 NullPointerException.class,

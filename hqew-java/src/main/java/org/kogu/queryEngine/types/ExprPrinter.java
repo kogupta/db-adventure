@@ -3,6 +3,7 @@ package org.kogu.queryEngine.types;
 import java.util.BitSet;
 import java.util.List;
 import java.util.Objects;
+import org.jspecify.annotations.Nullable;
 import org.kogu.queryEngine.types.Expr.*;
 import org.kogu.queryEngine.types.Type.Scalar;
 
@@ -19,7 +20,7 @@ public final class ExprPrinter {
 
     /// Renders an expression tree in ASCII box-drawing format, resolving output types
     /// against the provided schema if non-null.
-    public static String printTree(Expr expr, Schema schema) {
+    public static String printTree(Expr expr, @Nullable Schema schema) {
         Objects.requireNonNull(expr, "expr");
         StringBuilder sb = new StringBuilder();
         renderTree(expr, schema, "", "", sb);
@@ -45,7 +46,7 @@ public final class ExprPrinter {
         };
     }
 
-    private static void renderTree(Expr expr, Schema schema, String prefix,
+    private static void renderTree(Expr expr, @Nullable Schema schema, String prefix,
                                    String childPrefix, StringBuilder sb) {
         sb.append(prefix).append(formatNode(expr, schema)).append(System.lineSeparator());
 
@@ -58,7 +59,7 @@ public final class ExprPrinter {
         }
     }
 
-    private static String formatNode(Expr expr, Schema schema) {
+    private static String formatNode(Expr expr, @Nullable Schema schema) {
         String base = switch (expr) {
             case ColumnRef(var name) -> "ColumnRef(" + name + ")";
             case Literal.Int32(var val) -> "Literal(" + val + ")";

@@ -14,9 +14,18 @@
         <maven.compiler.release>27</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.version>5.12.2</junit.version>
+        <jspecify.version>1.0.0</jspecify.version>
+        <jspecify-packageinfo-generator.version>1.2.0</jspecify-packageinfo-generator.version>
+        <error-prone.version>2.49.0</error-prone.version>
+        <nullaway.version>0.13.4</nullaway.version>
     </properties>
 
     <dependencies>
+        <dependency>
+            <groupId>org.jspecify</groupId>
+            <artifactId>jspecify</artifactId>
+            <version>${jspecify.version}</version>
+        </dependency>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
@@ -34,13 +43,47 @@
     <build>
         <plugins>
             <plugin>
+                <groupId>io.github.bcaillard.jspecify-utilities</groupId>
+                <artifactId>jspecify-packageinfo-generator-maven-plugin</artifactId>
+                <version>${jspecify-packageinfo-generator.version}</version>
+                <executions>
+                    <execution>
+                        <id>generate-package-info</id>
+                        <goals>
+                            <goal>generate-package-info</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>generate-package-info-test</id>
+                        <goals>
+                            <goal>generate-package-info-test</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-compiler-plugin</artifactId>
                 <version>3.14.0</version>
                 <configuration>
                     <compilerArgs>
                         <arg>--enable-preview</arg>
+                        <arg>-XDcompilePolicy=simple</arg>
+                        <arg>--should-stop=ifError=FLOW</arg>
+                        <arg>-Xplugin:ErrorProne -XepDisableAllChecks -Xep:NullAway:ERROR -XepOpt:NullAway:AnnotatedPackages=org.kogu,io.andygrove -XepOpt:NullAway:JSpecifyMode=true</arg>
                     </compilerArgs>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>com.google.errorprone</groupId>
+                            <artifactId>error_prone_core</artifactId>
+                            <version>${error-prone.version}</version>
+                        </path>
+                        <path>
+                            <groupId>com.uber.nullaway</groupId>
+                            <artifactId>nullaway</artifactId>
+                            <version>${nullaway.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
                 </configuration>
             </plugin>
             <plugin>
