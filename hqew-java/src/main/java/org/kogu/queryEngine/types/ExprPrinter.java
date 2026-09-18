@@ -74,8 +74,8 @@ public final class ExprPrinter {
 
         if (schema != null) {
             try {
-                Type.Scalar type = expr.outputType(schema);
-                return base + " -> " + type;
+                ExprType type = expr.outputType(schema);
+                return base + " -> " + type.type();
             } catch (Exception e) {
                 return base + " -> [type error: " + e.getMessage() + "]";
             }

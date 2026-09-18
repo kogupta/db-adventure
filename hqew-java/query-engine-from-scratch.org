@@ -326,7 +326,7 @@ The block between BEGIN_MUTABLE_STATE and END_MUTABLE_STATE is rewritten in plac
 #+begin_src clojure
 {:state-version 1
  :course-status :in-progress
- :position {:unit "qe.08.operator-contract" :stage "stage-2" :checkpoint nil :status :in-progress}
+ :position {:unit "qe.10.project-exec" :stage "stage-2" :checkpoint nil :status :in-progress}
  :environment {:language :java :jdk 25 :build-tool :maven :repo-root "hqew-java" :test-framework :junit-5}
  :mastery {"qe.00.orientation" :demonstrated
            "qe.01.row-vs-column" :demonstrated
@@ -335,7 +335,10 @@ The block between BEGIN_MUTABLE_STATE and END_MUTABLE_STATE is rewritten in plac
            "qe.04.nulls" :demonstrated
            "qe.05.record-batch" :demonstrated
            "qe.06.expression-tree" :demonstrated
-           "qe.07.vector-expression-eval" :demonstrated}
+           "qe.07.vector-expression-eval" :demonstrated
+           "qe.08.operator-contract" :demonstrated
+           "qe.09.memory-scan" :demonstrated
+           "qe.10.project-exec" :working}
  :implementation
  {:capabilities
   ["lesson1 Main: graduation-query shape (filter->group->avg->sort desc) over both row objects and parallel int[] columns; equivalence test passes (rowEval/columnEval)"
@@ -350,7 +353,9 @@ The block between BEGIN_MUTABLE_STATE and END_MUTABLE_STATE is rewritten in plac
    "ExprEvaluatorTest: 4 behavioral checks green (45 tests total) — length == rowCount over 26 expression shapes; GT over a null-bearing batch; the full 3VL AND/OR table including both-null; boundary invisibility across one 8-row batch against windows of 3+3+2, covering arithmetic, comparison, and a compound AND with a literal operand"
    "ExprEvaluator: static eval(Expr, RecordBatch) -> Vector. ColumnRef returns the batch vector unchanged, literals build Constant*, arithmetic/comparison dispatch one arm per element type, 3VL AND/OR/NOT correct including the both-null case; kernels share a perSlot(bothNonNull, writeSlot, length) driver"
    "qe.07 ExprEvaluator tests: pins rowCount preservation across all AST shapes, null propagation with differing-junk invariance on trip_distance > 5, 3VL short-circuit (false AND null / true OR null), boundary invisibility (8-row batch vs 3+3+2 concatenated), and mixed-type rejection (TypeMismatchException)"]
-  :current-design ["Type as sealed interface chosen over enum for future nested types; Schema stores LinkedHashMap name->field; Vector contract mechanism-free; nulls are data not holes; batch boundaries are execution detail; Expr type rules reject mixed widths deliberately (INT32+INT64 rejected until a query forces coercion)"]
+   "qe.08 operator contract: Exec exposes stable schema plus Optional<RecordBatch> next(); BufferedExec final next() skips zero-row batches, latches permanent exhaustion, and prevents pulls after EOF; 9 focused execution tests pass within the 59-test suite"
+   "qe.09 MemoryScanExec: deterministic in-memory source preserves supplied batch order; BufferedExec enforces zero-row suppression and permanent exhaustion; 14 focused MemoryScanExec tests pass"
+  :current-design ["Type as sealed interface chosen over enum for future nested types; expression metadata uses Type plus independent nullability while scalar-only operators explicitly narrow to Type.Scalar; Schema stores LinkedHashMap name->field; Vector contract mechanism-free; nulls are data not holes; batch boundaries are execution detail; Expr type rules reject mixed widths deliberately (INT32+INT64 rejected until a query forces coercion)"]
   :known-correctness-gaps
   ["RecordBatch.vectors() returns mutable internal array (encapsulation pass pending)"
    "Record accessors values()/nullIndices() still leak the backing array on windowed vectors, though nullIndices() is now off the Vector interface"
@@ -368,8 +373,9 @@ The block between BEGIN_MUTABLE_STATE and END_MUTABLE_STATE is rewritten in plac
   {:id "D-005" :decision "Tutor does not provide implementation code by default." :reason "Learner writes engine; tutor explains, probes, reviews, and escalates hints."}
   {:id "D-007" :decision "Vector splits by element type before storage: Vector -> IntVec/LongVec/DoubleVec/BoolVec/Utf8Vec -> record storages." :reason "Kernels name element type only, so constant-vs-windowed storage never multiplies switch arms; arm count is ops x type rather than ops x storage x storage."}
   {:id "D-006" :decision "Literals evaluate to a length-carrying Scalar Vector variant that may escape the evaluator (option A); consumers switch on it." :reason "Avoids a 65KB filled array per batch per literal; sealed Vector makes the compiler flag every consumer that must handle it."}
-  {:id "D-008" :decision "Exec pull contract: interface Exec { Schema schema(); Optional<RecordBatch> next(); } — single pull method; Optional.empty() = exhausted (stays exhausted on later calls); a present batch always has rowCount>=1, zero-row batches never cross next(); schema() knowable before the first pull; children are construction-time private fields, so one interface serves 0/1/2-child operators; abstract BufferedExec holds a pending buffer over an abstract pull() to enforce the non-empty policy in one place." :reason "A single method makes hasNext/next desync unrepresentable; end-of-stream lives in the return type rather than sentinel batches or flags; consumers never handle empty batches."}]
- :next-action "qe.08 in progress. Learner chose pull-based batch iteration with policy B (no zero-row batches mid-stream) and RecordBatch currency, then explicitly requested interface shapes at H3 — prefers type/code-first explanations over prose-only. Tutor supplied: Exec {schema(); Optional<RecordBatch> next()}, arity-as-construction shells (0/1/2 children), and BufferedExec with an abstract pull() plus a TODO lookahead loop in next(). To close qe.08 the learner must: implement BufferedExec.next(), explain control flow / end-of-stream / non-empty / arity decisions in their own words, and trace Limit(2) over 3+3+2 under the contract. Then qe.09: MemoryScanExec + 0/1/many-batch tests. Build notes: JDK 26 required (pom sets release 26); run mvn clean after editing any permits clause, else stale classes throw IncompatibleClassChangeError."}
+  {:id "D-008" :decision "Exec pull contract: interface Exec { Schema schema(); Optional<RecordBatch> next(); } — single pull method; Optional.empty() = exhausted (stays exhausted on later calls); a present batch always has rowCount>=1, zero-row batches never cross next(); schema() knowable before the first pull; children are construction-time private fields, so one interface serves 0/1/2-child operators; abstract BufferedExec centralizes the non-empty-batch and permanent-exhaustion policy over an abstract pull()." :reason "A single method makes hasNext/next desync unrepresentable; end-of-stream lives in the return type; consumers never handle empty batches."}
+  {:id "D-009" :decision "Expression result metadata carries Type plus an independent nullable flag; scalar-only expression nodes explicitly require Type.Scalar." :reason "Avoid a later public metadata migration when Type gains variants while retaining explicit rejection at operations that only support scalars."}]
+ :next-action "qe.10: implement expression result metadata as Type plus nullability, with scalar-only operators narrowing explicitly; then derive ProjectExec schema from ordered aliases and expression metadata."
 #+end_src
 # END_MUTABLE_STATE
 

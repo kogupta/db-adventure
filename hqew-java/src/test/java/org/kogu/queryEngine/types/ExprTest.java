@@ -20,7 +20,7 @@ class ExprTest {
                 new Field("fare_amount", Scalar.INT64, false)));
         Set<String> references = new LinkedHashSet<>();
 
-        assertEquals(Scalar.INT64, column.outputType(schema));
+        assertEquals(Scalar.INT64, column.outputType(schema).type());
         column.collectReferences(references);
         assertEquals(Set.of("fare_amount"), references);
     }
@@ -29,11 +29,11 @@ class ExprTest {
     void everyLiteralReportsItsScalarType() {
         Schema schema = Schema.from(List.of());
 
-        assertEquals(Scalar.INT32, new Literal.Int32(1).outputType(schema));
-        assertEquals(Scalar.INT64, new Literal.Int64(1L).outputType(schema));
-        assertEquals(Scalar.FLOAT64, new Literal.Float64(1.0).outputType(schema));
-        assertEquals(Scalar.UTF8, new Literal.Str("one").outputType(schema));
-        assertEquals(Scalar.BOOLEAN, Literal.Bool.True.outputType(schema));
+        assertEquals(Scalar.INT32, new Literal.Int32(1).outputType(schema).type());
+        assertEquals(Scalar.INT64, new Literal.Int64(1L).outputType(schema).type());
+        assertEquals(Scalar.FLOAT64, new Literal.Float64(1.0).outputType(schema).type());
+        assertEquals(Scalar.UTF8, new Literal.Str("one").outputType(schema).type());
+        assertEquals(Scalar.BOOLEAN, Literal.Bool.True.outputType(schema).type());
     }
 
     @Test
@@ -49,8 +49,7 @@ class ExprTest {
                 ComparisionOps.LTEq,
                 ComparisionOps.GT,
                 ComparisionOps.GTEq)) {
-            assertEquals(Scalar.BOOLEAN,
-                    new BinaryExpr(left, op, right).outputType(schema));
+            assertEquals(Scalar.BOOLEAN, new BinaryExpr(left, op, right).outputType(schema).type());
         }
     }
 
@@ -79,8 +78,7 @@ class ExprTest {
                 case FLOAT64 -> new Literal.Float64(1.0);
                 default -> throw new AssertionError(type);
             };
-            assertEquals(type,
-                    new BinaryExpr(literal, ArithmeticOps.Add, literal).outputType(schema));
+            assertEquals(type, new BinaryExpr(literal, ArithmeticOps.Add, literal).outputType(schema).type());
         }
 
         Expr.TypeMismatchException error = assertThrows(
@@ -97,10 +95,8 @@ class ExprTest {
         Schema schema = Schema.from(List.of());
         Expr bool = Literal.Bool.True;
 
-        assertEquals(Scalar.BOOLEAN,
-                new Expr.UnaryExpr(UnaryOp.NOT, bool).outputType(schema));
-        assertEquals(Scalar.BOOLEAN,
-                new Expr.LogicalExpr(bool, LogicalOp.AND, bool).outputType(schema));
+        assertEquals(Scalar.BOOLEAN, new Expr.UnaryExpr(UnaryOp.NOT, bool).outputType(schema).type());
+        assertEquals(Scalar.BOOLEAN, new Expr.LogicalExpr(bool, LogicalOp.AND, bool).outputType(schema).type());
 
         Expr.TypeMismatchException unaryError = assertThrows(
                 Expr.TypeMismatchException.class,
