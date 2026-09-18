@@ -10,10 +10,6 @@ public final class MemoryScanExec extends BufferedExec {
     private final List<RecordBatch> batches;
     private int index = 0;
 
-    public MemoryScanExec(Schema schema) {
-        this(schema, List.of());
-    }
-
     public MemoryScanExec(Schema schema, List<RecordBatch> batches) {
         super(schema);
         this.batches = batches;
@@ -24,5 +20,9 @@ public final class MemoryScanExec extends BufferedExec {
         return index < batches.size() ?
                 Optional.of(batches.get(index++)) :
                 Optional.empty();
+    }
+
+    public static MemoryScanExec of(Schema schema) {
+        return new MemoryScanExec(schema, List.of());
     }
 }

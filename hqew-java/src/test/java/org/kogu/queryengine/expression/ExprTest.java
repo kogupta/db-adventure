@@ -151,18 +151,18 @@ class ExprTest {
         Schema schema = Schema.from(List.of());
         Expr bool = Literal.Bool.True;
 
-        assertEquals(Scalar.BOOLEAN, new Expr.UnaryExpr(UnaryOp.NOT, bool).outputType(schema).type());
-        assertEquals(Scalar.BOOLEAN, new Expr.LogicalExpr(bool, LogicalOp.AND, bool).outputType(schema).type());
+        assertEquals(Scalar.BOOLEAN, new UnaryExpr(UnaryOp.NOT, bool).outputType(schema).type());
+        assertEquals(Scalar.BOOLEAN, new LogicalExpr(bool, LogicalOp.AND, bool).outputType(schema).type());
 
         Expr.TypeMismatchException unaryError = assertThrows(
                 Expr.TypeMismatchException.class,
-                () -> new Expr.UnaryExpr(UnaryOp.NOT, new Literal.Int32(1))
+                () -> new UnaryExpr(UnaryOp.NOT, new Literal.Int32(1))
                         .outputType(schema));
         assertEquals("Cannot apply NOT: operand type INT32, expected BOOLEAN", unaryError.getMessage());
 
         Expr.TypeMismatchException logicalError = assertThrows(
                 Expr.TypeMismatchException.class,
-                () -> new Expr.LogicalExpr(
+                () -> new LogicalExpr(
                         bool, LogicalOp.OR, new Literal.Int32(1)).outputType(schema));
         assertEquals("Cannot apply OR: left type BOOLEAN, right type INT32, expected BOOLEAN operands",
                 logicalError.getMessage());
@@ -170,7 +170,7 @@ class ExprTest {
 
     @Test
     void nestedExpressionsCollectDistinctReferences() {
-        Expr expression = new Expr.LogicalExpr(
+        Expr expression = new LogicalExpr(
                 new BinaryExpr(
                         new ColumnRef("fare_amount"), ComparisonOp.GT,
                         new Literal.Int32(5)), LogicalOp.AND,

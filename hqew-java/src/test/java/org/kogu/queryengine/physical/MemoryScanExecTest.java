@@ -30,7 +30,7 @@ class MemoryScanExecTest {
 
     @Test
     void zeroInputBatchesWithDefaultConstructorExhaustsImmediately() {
-        MemoryScanExec exec = new MemoryScanExec(TEST_SCHEMA);
+        MemoryScanExec exec = MemoryScanExec.of(TEST_SCHEMA);
 
         assertSame(TEST_SCHEMA, exec.schema());
         assertTrue(exec.next().isEmpty());
@@ -125,7 +125,7 @@ class MemoryScanExecTest {
 
     @Test
     void schemaIsAvailableBeforeFirstNextCall() {
-        MemoryScanExec exec = new MemoryScanExec(TEST_SCHEMA);
+        MemoryScanExec exec = MemoryScanExec.of(TEST_SCHEMA);
         assertSame(TEST_SCHEMA, exec.schema());
 
         RecordBatch batch = createBatch(TEST_SCHEMA, new int[]{42});

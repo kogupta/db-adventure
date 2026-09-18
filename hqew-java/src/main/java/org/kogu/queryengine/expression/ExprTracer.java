@@ -6,16 +6,11 @@ import org.kogu.queryengine.columnar.Vector;
 import java.util.ArrayList;
 import java.util.List;
 
-public final class ExprTracer {
+final class ExprTracer {
     private ExprTracer() {}
 
-    public record TraceStep(
-            int stepNumber,
-            Expr expr,
-            String description,
-            List<Integer> inputStepNumbers,
-            Vector resultVector
-    ) {
+    public record TraceStep(int stepNumber, Expr expr, String description,
+                            List<Integer> inputStepNumbers, Vector resultVector) {
         public String format() {
             StringBuilder sb = new StringBuilder();
             sb.append("Step ").append(stepNumber).append(": ").append(description).append(System.lineSeparator());
@@ -35,12 +30,8 @@ public final class ExprTracer {
         }
     }
 
-    public record TraceReport(
-            Expr rootExpr,
-            RecordBatch batch,
-            Vector finalResult,
-            List<TraceStep> steps
-    ) {
+    public record TraceReport(Expr rootExpr, RecordBatch batch, Vector finalResult,
+                              List<TraceStep> steps) {
         @Override
         public String toString() {
             StringBuilder sb = new StringBuilder();
@@ -68,8 +59,8 @@ public final class ExprTracer {
     private static Vector traceRecursive(Expr expr, RecordBatch batch, List<TraceStep> steps) {
         List<Integer> inputSteps = new ArrayList<>();
         switch (expr) {
-            case Expr.ColumnRef _, Expr.Literal _ -> {}
-            case Expr.BinaryExpr(var left, _, var right) -> {
+            case ColumnRef _, Literal _ -> {}
+            case BinaryExpr(var left, _, var right) -> {
                 traceRecursive(left, batch, steps);
                 int leftStep = steps.size();
                 traceRecursive(right, batch, steps);
@@ -77,11 +68,11 @@ public final class ExprTracer {
                 inputSteps.add(leftStep);
                 inputSteps.add(rightStep);
             }
-            case Expr.UnaryExpr(_, var e) -> {
+            case UnaryExpr(_, var e) -> {
                 traceRecursive(e, batch, steps);
                 inputSteps.add(steps.size());
             }
-            case Expr.LogicalExpr(var left, _, var right) -> {
+            case LogicalExpr(var left, _, var right) -> {
                 traceRecursive(left, batch, steps);
                 int leftStep = steps.size();
                 traceRecursive(right, batch, steps);
@@ -100,13 +91,13 @@ public final class ExprTracer {
 
     private static String formatStepDescription(Expr expr) {
         return switch (expr) {
-            case Expr.ColumnRef(var name) -> "EVAL ColumnRef(\"" + name + "\")";
-            case Expr.Literal lit -> "EVAL Literal: " + ExprPrinter.toInfix(lit);
-            case Expr.BinaryExpr(var left, var op, var right) ->
+            case ColumnRef(var name) -> "EVAL ColumnRef(\"" + name + "\")";
+            case Literal lit -> "EVAL Literal: " + ExprPrinter.toInfix(lit);
+            case BinaryExpr(var left, var op, var right) ->
                     "EVAL BinaryExpr " + op.token() + " (" + ExprPrinter.toInfix(left) + " " + op.token() + " " + ExprPrinter.toInfix(right) + ")";
-            case Expr.UnaryExpr(var op, var e) ->
+            case UnaryExpr(var op, var e) ->
                     "EVAL UnaryExpr " + op.name() + " (" + ExprPrinter.toInfix(e) + ")";
-            case Expr.LogicalExpr(var left, var op, var right) ->
+            case LogicalExpr(var left, var op, var right) ->
                     "EVAL LogicalExpr " + op.name() + " (" + ExprPrinter.toInfix(left) + " " + op.name() + " " + ExprPrinter.toInfix(right) + ")";
         };
     }

@@ -1,6 +1,5 @@
 package org.kogu.queryengine.expression;
 
-import org.kogu.queryengine.expression.Expr.Literal;
 import org.kogu.queryengine.expression.Expr.LogicalOp;
 import org.kogu.queryengine.columnar.RecordBatch;
 import org.kogu.queryengine.columnar.Vector;
@@ -17,13 +16,13 @@ public final class ExprEvaluator {
 
     public static Vector eval(Expr expr, RecordBatch batch) {
         return switch (expr) {
-            case Expr.ColumnRef(var name) -> batch.vectorOf(name);
+            case ColumnRef(var name) -> batch.vectorOf(name);
             case Literal.Int32(var n) -> new ConstantInt(n, batch.rowCount());
             case Literal.Int64(var n) -> new ConstantLong(n, batch.rowCount());
             case Literal.Float64(var d) -> new ConstantDouble(d, batch.rowCount());
             case Literal.Str(var s) -> new ConstantUtf8(s, batch.rowCount());
             case Literal.Bool bool -> new ConstantBool(bool.value, batch.rowCount());
-            case Expr.BinaryExpr(var left, var op, var right) -> {
+            case BinaryExpr(var left, var op, var right) -> {
                 Vector a = eval(left, batch);
                 Vector b = eval(right, batch);
                 yield switch (op) {
@@ -31,8 +30,8 @@ public final class ExprEvaluator {
                     case ComparisonOp o -> compare(a, o, b);
                 };
             }
-            case Expr.UnaryExpr(var op, Expr e) -> evalUnary(batch, op, e);
-            case Expr.LogicalExpr(var left, var op, var right) -> {
+            case UnaryExpr(var op, Expr e) -> evalUnary(batch, op, e);
+            case LogicalExpr(var left, var op, var right) -> {
                 Vector a = eval(left, batch);
                 Vector b = eval(right, batch);
                 if (!(a instanceof BoolVec l) || !(b instanceof BoolVec r))

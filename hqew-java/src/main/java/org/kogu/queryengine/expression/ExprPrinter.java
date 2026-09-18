@@ -15,7 +15,7 @@ import org.kogu.queryengine.type.Type.Scalar;
 import static org.kogu.queryengine.expression.ComparisonOp.GT;
 import static org.kogu.queryengine.expression.Exprs.*;
 
-public final class ExprPrinter {
+final class ExprPrinter {
     private ExprPrinter() {}
 
     /// Renders an expression tree in ASCII box-drawing format without type resolution.
