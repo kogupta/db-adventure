@@ -1,10 +1,10 @@
 package org.kogu.queryengine.physical;
 
+import org.jspecify.annotations.Nullable;
 import org.kogu.queryengine.columnar.RecordBatch;
 import org.kogu.queryengine.type.Schema;
 
 import java.util.List;
-import java.util.Optional;
 
 public final class MemoryScanExec extends BufferedExec {
     private final List<RecordBatch> batches;
@@ -16,10 +16,10 @@ public final class MemoryScanExec extends BufferedExec {
     }
 
     @Override
-    protected Optional<RecordBatch> pull() {
+    protected @Nullable RecordBatch pull() {
         return index < batches.size() ?
-                Optional.of(batches.get(index++)) :
-                Optional.empty();
+                batches.get(index++) :
+                null;
     }
 
     public static MemoryScanExec of(Schema schema) {

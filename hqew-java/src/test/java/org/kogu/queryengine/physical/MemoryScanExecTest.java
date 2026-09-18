@@ -9,7 +9,6 @@ import org.kogu.queryengine.type.Schema;
 import org.kogu.queryengine.type.Type;
 
 import java.util.List;
-import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -24,16 +23,12 @@ class MemoryScanExecTest {
             new Field("name", Type.Scalar.UTF8, false)
     ));
 
-    // -------------------------------------------------------------------------
-    // 1. Zero input batches
-    // -------------------------------------------------------------------------
-
     @Test
     void zeroInputBatchesWithDefaultConstructorExhaustsImmediately() {
         MemoryScanExec exec = MemoryScanExec.of(TEST_SCHEMA);
 
         assertSame(TEST_SCHEMA, exec.schema());
-        assertTrue(exec.next().isEmpty());
+        assertNull(exec.next());
     }
 
     @Test
@@ -41,30 +36,20 @@ class MemoryScanExecTest {
         MemoryScanExec exec = new MemoryScanExec(TEST_SCHEMA, List.of());
 
         assertSame(TEST_SCHEMA, exec.schema());
-        assertTrue(exec.next().isEmpty());
+        assertNull(exec.next());
     }
-
-    // -------------------------------------------------------------------------
-    // 2. One input batch
-    // -------------------------------------------------------------------------
 
     @Test
     void oneInputBatchReturnsBatchThenExhausts() {
         RecordBatch batch = createBatch(TEST_SCHEMA, new int[]{1, 2, 3});
         MemoryScanExec exec = new MemoryScanExec(TEST_SCHEMA, List.of(batch));
 
-        Optional<RecordBatch> first = exec.next();
-        assertTrue(first.isPresent());
-        assertSame(batch, first.get());
-        assertEquals(3, first.get().rowCount());
-
-        Optional<RecordBatch> second = exec.next();
-        assertTrue(second.isEmpty());
+        var first = exec.next();
+        assertNotNull(first);
+        assertSame(batch, first);
+        assertEquals(3, first.rowCount());
+        assertNull(exec.next());
     }
-
-    // -------------------------------------------------------------------------
-    // 3. Many input batches
-    // -------------------------------------------------------------------------
 
     @Test
     void manyInputBatchesReturnedInStrictOrder() {
@@ -74,23 +59,22 @@ class MemoryScanExecTest {
 
         MemoryScanExec exec = new MemoryScanExec(TEST_SCHEMA, List.of(batch1, batch2, batch3));
 
-        Optional<RecordBatch> out1 = exec.next();
-        assertTrue(out1.isPresent());
-        assertSame(batch1, out1.get());
-        assertEquals(2, out1.get().rowCount());
+        var out1 = exec.next();
+        assertNotNull(out1);
+        assertSame(batch1, out1);
+        assertEquals(2, out1.rowCount());
 
-        Optional<RecordBatch> out2 = exec.next();
-        assertTrue(out2.isPresent());
-        assertSame(batch2, out2.get());
-        assertEquals(3, out2.get().rowCount());
+        var out2 = exec.next();
+        assertNotNull(out2);
+        assertSame(batch2, out2);
+        assertEquals(3, out2.rowCount());
 
-        Optional<RecordBatch> out3 = exec.next();
-        assertTrue(out3.isPresent());
-        assertSame(batch3, out3.get());
-        assertEquals(1, out3.get().rowCount());
+        var out3 = exec.next();
+        assertNotNull(out3);
+        assertSame(batch3, out3);
+        assertEquals(1, out3.rowCount());
 
-        Optional<RecordBatch> out4 = exec.next();
-        assertTrue(out4.isEmpty());
+        assertNull(exec.next());
     }
 
     @Test
@@ -108,20 +92,10 @@ class MemoryScanExecTest {
 
         MemoryScanExec exec = new MemoryScanExec(MULTI_COLUMN_SCHEMA, List.of(batch1, batch2));
 
-        Optional<RecordBatch> out1 = exec.next();
-        assertTrue(out1.isPresent());
-        assertSame(batch1, out1.get());
-
-        Optional<RecordBatch> out2 = exec.next();
-        assertTrue(out2.isPresent());
-        assertSame(batch2, out2.get());
-
-        assertTrue(exec.next().isEmpty());
+        assertSame(batch1, exec.next());
+        assertSame(batch2, exec.next());
+        assertNull(exec.next());
     }
-
-    // -------------------------------------------------------------------------
-    // 4. Stable schema
-    // -------------------------------------------------------------------------
 
     @Test
     void schemaIsAvailableBeforeFirstNextCall() {
@@ -139,43 +113,30 @@ class MemoryScanExecTest {
         RecordBatch batch2 = createBatch(TEST_SCHEMA, new int[]{2, 3});
         MemoryScanExec exec = new MemoryScanExec(TEST_SCHEMA, List.of(batch1, batch2));
 
-        // Schema before first next()
         assertSame(TEST_SCHEMA, exec.schema());
 
-        // Schema after pulling first batch
-        Optional<RecordBatch> out1 = exec.next();
-        assertTrue(out1.isPresent());
+        var out1 = exec.next();
+        assertNotNull(out1);
         assertSame(TEST_SCHEMA, exec.schema());
-        assertSame(TEST_SCHEMA, out1.get().schema());
+        assertSame(TEST_SCHEMA, out1.schema());
 
-        // Schema after pulling second batch
-        Optional<RecordBatch> out2 = exec.next();
-        assertTrue(out2.isPresent());
+        var out2 = exec.next();
+        assertNotNull(out2);
         assertSame(TEST_SCHEMA, exec.schema());
-        assertSame(TEST_SCHEMA, out2.get().schema());
+        assertSame(TEST_SCHEMA, out2.schema());
 
-        // Schema after exhaustion
-        Optional<RecordBatch> out3 = exec.next();
-        assertTrue(out3.isEmpty());
+        assertNull(exec.next());
         assertSame(TEST_SCHEMA, exec.schema());
-
-        // Schema on repeated calls after exhaustion
         assertSame(TEST_SCHEMA, exec.schema());
     }
-
-    // -------------------------------------------------------------------------
-    // 5. Permanent exhaustion
-    // -------------------------------------------------------------------------
 
     @Test
     void permanentExhaustionWhenZeroBatches() {
         MemoryScanExec exec = new MemoryScanExec(TEST_SCHEMA, List.of());
 
-        assertTrue(exec.next().isEmpty());
-
-        // Repeated subsequent calls stay permanently exhausted
+        assertNull(exec.next());
         for (int i = 0; i < 5; i++) {
-            assertTrue(exec.next().isEmpty(), "Call " + i + " after exhaustion must return empty");
+            assertNull(exec.next(), "Call " + i + " after exhaustion must return null");
         }
     }
 
@@ -184,12 +145,10 @@ class MemoryScanExecTest {
         RecordBatch batch = createBatch(TEST_SCHEMA, new int[]{100});
         MemoryScanExec exec = new MemoryScanExec(TEST_SCHEMA, List.of(batch));
 
-        assertTrue(exec.next().isPresent());
-        assertTrue(exec.next().isEmpty());
-
-        // Repeated subsequent calls stay permanently exhausted
+        assertNotNull(exec.next());
+        assertNull(exec.next());
         for (int i = 0; i < 5; i++) {
-            assertTrue(exec.next().isEmpty(), "Call " + i + " after exhaustion must return empty");
+            assertNull(exec.next(), "Call " + i + " after exhaustion must return null");
         }
     }
 
@@ -199,19 +158,13 @@ class MemoryScanExecTest {
         RecordBatch b2 = createBatch(TEST_SCHEMA, new int[]{2});
         MemoryScanExec exec = new MemoryScanExec(TEST_SCHEMA, List.of(b1, b2));
 
-        assertTrue(exec.next().isPresent());
-        assertTrue(exec.next().isPresent());
-        assertTrue(exec.next().isEmpty());
-
-        // Repeated subsequent calls stay permanently exhausted
+        assertNotNull(exec.next());
+        assertNotNull(exec.next());
+        assertNull(exec.next());
         for (int i = 0; i < 5; i++) {
-            assertTrue(exec.next().isEmpty(), "Call " + i + " after exhaustion must return empty");
+            assertNull(exec.next(), "Call " + i + " after exhaustion must return null");
         }
     }
-
-    // -------------------------------------------------------------------------
-    // 6. No zero-row batches crossing next()
-    // -------------------------------------------------------------------------
 
     @Test
     void skipsInterleavedZeroRowBatches() {
@@ -222,32 +175,21 @@ class MemoryScanExecTest {
         RecordBatch valid2 = createBatch(TEST_SCHEMA, new int[]{30});
 
         MemoryScanExec exec = new MemoryScanExec(TEST_SCHEMA, List.of(
-                zeroRow1,
-                valid1,
-                zeroRow2,
-                zeroRow3,
-                valid2,
-                createBatch(TEST_SCHEMA, new int[0])
-        ));
+                zeroRow1, valid1, zeroRow2, zeroRow3, valid2,
+                createBatch(TEST_SCHEMA, new int[0])));
 
-        // First non-empty batch returned; zeroRow1 was skipped
-        Optional<RecordBatch> out1 = exec.next();
-        assertTrue(out1.isPresent());
-        assertSame(valid1, out1.get());
-        assertTrue(out1.get().rowCount() > 0);
+        var out1 = exec.next();
+        assertNotNull(out1);
+        assertSame(valid1, out1);
+        assertTrue(out1.rowCount() > 0);
 
-        // Second non-empty batch returned; zeroRow2 and zeroRow3 were skipped
-        Optional<RecordBatch> out2 = exec.next();
-        assertTrue(out2.isPresent());
-        assertSame(valid2, out2.get());
-        assertTrue(out2.get().rowCount() > 0);
+        var out2 = exec.next();
+        assertNotNull(out2);
+        assertSame(valid2, out2);
+        assertTrue(out2.rowCount() > 0);
 
-        // Trailing zero-row batch is skipped; reaches EOF
-        Optional<RecordBatch> out3 = exec.next();
-        assertTrue(out3.isEmpty());
-
-        // Remains exhausted
-        assertTrue(exec.next().isEmpty());
+        assertNull(exec.next());
+        assertNull(exec.next());
     }
 
     @Test
@@ -258,13 +200,9 @@ class MemoryScanExecTest {
 
         MemoryScanExec exec = new MemoryScanExec(TEST_SCHEMA, List.of(zeroRow1, zeroRow2, zeroRow3));
 
-        // All zero-row batches skipped; immediately exhausted
-        Optional<RecordBatch> out = exec.next();
-        assertTrue(out.isEmpty());
-
-        // Permanent exhaustion holds
+        assertNull(exec.next());
         for (int i = 0; i < 5; i++) {
-            assertTrue(exec.next().isEmpty());
+            assertNull(exec.next());
         }
     }
 
@@ -276,11 +214,8 @@ class MemoryScanExecTest {
 
         MemoryScanExec exec = new MemoryScanExec(TEST_SCHEMA, List.of(zeroRow1, zeroRow2, valid));
 
-        Optional<RecordBatch> out1 = exec.next();
-        assertTrue(out1.isPresent());
-        assertSame(valid, out1.get());
-
-        assertTrue(exec.next().isEmpty());
+        assertSame(valid, exec.next());
+        assertNull(exec.next());
     }
 
     @Test
@@ -291,17 +226,10 @@ class MemoryScanExecTest {
 
         MemoryScanExec exec = new MemoryScanExec(TEST_SCHEMA, List.of(valid, zeroRow1, zeroRow2));
 
-        Optional<RecordBatch> out1 = exec.next();
-        assertTrue(out1.isPresent());
-        assertSame(valid, out1.get());
-
-        assertTrue(exec.next().isEmpty());
-        assertTrue(exec.next().isEmpty());
+        assertSame(valid, exec.next());
+        assertNull(exec.next());
+        assertNull(exec.next());
     }
-
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
 
     private static RecordBatch createBatch(Schema schema, int[] values) {
         return new RecordBatch(schema, new Vector[]{Vectors.intVector(values)});
