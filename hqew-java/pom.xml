@@ -8,10 +8,10 @@
     <artifactId>kquery-java</artifactId>
     <version>0.1.0-SNAPSHOT</version>
     <name>KQuery Java</name>
-    <description>Java 26 learning port of How Query Engines Work</description>
+    <description>Java 27 learning port of How Query Engines Work</description>
 
     <properties>
-        <maven.compiler.release>26</maven.compiler.release>
+        <maven.compiler.release>27</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <junit.version>5.12.2</junit.version>
     </properties>
@@ -21,6 +21,12 @@
             <groupId>org.junit.jupiter</groupId>
             <artifactId>junit-jupiter</artifactId>
             <version>${junit.version}</version>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>ai.z.openapi</groupId>
+            <artifactId>zai-sdk</artifactId>
+            <version>0.3.5</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
