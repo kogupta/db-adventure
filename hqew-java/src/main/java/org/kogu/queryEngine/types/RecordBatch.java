@@ -9,12 +9,8 @@ public final class RecordBatch {
     private final int rowCount;
 
     public RecordBatch(Schema schema, Vector[] vectors) {
-        Objects.requireNonNull(schema, "schema");
-        Objects.requireNonNull(vectors, "vectors");
-
         if (vectors.length != schema.fieldsList.size()) {
-            throw new IllegalArgumentException(
-                    "vector count does not match schema field count");
+            throw new IllegalArgumentException("vector count does not match schema field count");
         }
 
         for (int i = 0; i < vectors.length; i++) {

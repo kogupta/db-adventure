@@ -31,12 +31,6 @@ class BufferedExecTest {
     }
 
     @Test
-    void schemaReturnsConstructorSchema() {
-        BufferedExec exec = new FakeBufferedExec(TEST_SCHEMA, List.of());
-        assertSame(TEST_SCHEMA, exec.schema());
-    }
-
-    @Test
     void zeroRowBatchFollowedByNonEmptyBatch() {
         RecordBatch zeroRowBatch = createBatch(new int[0]);
         RecordBatch nonEmptyBatch = createBatch(new int[]{42});

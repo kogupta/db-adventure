@@ -9,7 +9,7 @@ public abstract class BufferedExec implements Exec {
     private final Schema schema;
     private boolean exhausted;
 
-    public BufferedExec(Schema schema) {this.schema = schema;}
+    protected BufferedExec(Schema schema) {this.schema = schema;}
 
     @Override
     public Schema schema() {return schema;}
