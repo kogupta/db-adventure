@@ -87,6 +87,51 @@ class ExprEvaluatorTest {
         }
     }
 
+    private static void assertVectorsEqualSlotForSlot(Vector expected, List<Vector> pieces) {
+        int totalLength = pieces.stream().mapToInt(Vector::length).sum();
+        assertEquals(expected.length(), totalLength, "Total length across pieces must equal single batch length");
+
+        int globalRow = 0;
+        for (Vector piece : pieces) {
+            for (int localRow = 0; localRow < piece.length(); localRow++) {
+                assertEquals(expected.isNull(globalRow), piece.isNull(localRow),
+                        "Nullness mismatch at global row " + globalRow);
+
+                if (!expected.isNull(globalRow)) {
+                    switch (expected) {
+                        case IntVec exp when piece instanceof IntVec act ->
+                                assertEquals(exp.value(globalRow), act.value(localRow),
+                                        "Int value mismatch at global row " + globalRow);
+                        case LongVec exp when piece instanceof LongVec act ->
+                                assertEquals(exp.value(globalRow), act.value(localRow),
+                                        "Long value mismatch at global row " + globalRow);
+                        case DoubleVec exp when piece instanceof DoubleVec act ->
+                                assertEquals(exp.value(globalRow), act.value(localRow), 1e-9,
+                                        "Double value mismatch at global row " + globalRow);
+                        case BoolVec exp when piece instanceof BoolVec act ->
+                                assertEquals(exp.value(globalRow), act.value(localRow),
+                                        "Boolean value mismatch at global row " + globalRow);
+                        case Utf8Vec exp when piece instanceof Utf8Vec act ->
+                                assertEquals(exp.value(globalRow), act.value(localRow),
+                                        "String value mismatch at global row " + globalRow);
+                        default -> fail("Unexpected vector type: " + expected.getClass());
+                    }
+                }
+                globalRow++;
+            }
+        }
+    }
+
+    private static List<Boolean> readNonNullBools(BoolVec vec) {
+        var list = new ArrayList<Boolean>();
+        for (int i = 0; i < vec.length(); i++) {
+            if (vec.isNotNull(i)) {
+                list.add(vec.value(i));
+            }
+        }
+        return List.copyOf(list);
+    }
+
     @Test
     @DisplayName("Invariant 2: trip_distance > 5 over the 8-row batch — rows 2 and 7 invalid (junk invariant)")
     void tripDistanceGreaterThanFiveOverEightRowBatchLeavesRowsTwoAndSevenInvalid() {
@@ -112,8 +157,8 @@ class ExprEvaluatorTest {
         assertEquals(8, batch2.rowCount());
 
         Expr predicate = new BinaryExpr(new ColumnRef("trip_distance"), ComparisonOp.GT, new Literal.Int32(5));
-        Vector.BoolVec result1 = (Vector.BoolVec) ExprEvaluator.eval(predicate, batch1);
-        Vector.BoolVec result2 = (Vector.BoolVec) ExprEvaluator.eval(predicate, batch2);
+        BoolVec result1 = (BoolVec) ExprEvaluator.eval(predicate, batch1);
+        BoolVec result2 = (BoolVec) ExprEvaluator.eval(predicate, batch2);
 
         assertEquals(8, result1.length());
         assertEquals(8, result2.length());
@@ -144,6 +189,37 @@ class ExprEvaluatorTest {
         // Gated non-null values match expected list: [false, true, false, true, false, true]
         assertEquals(List.of(false, true, false, true, false, true), readNonNullBools(result1));
         assertEquals(readNonNullBools(result1), readNonNullBools(result2));
+    }
+
+    @Test
+    @DisplayName("Invariant 5: Evaluator rejects mixed types with TypeMismatchException")
+    void rejectsMixedTypeEvaluationWithDetails() {
+        Schema schema = Schema.from(List.of(
+                new Field("c_int", Scalar.INT32, true),
+                new Field("c_long", Scalar.INT64, true)
+        ));
+        RecordBatch batch = new RecordBatch(schema, new Vector[]{
+                Vectors.intVector(new int[]{1, 2}),
+                Vectors.longVector(new long[]{10L, 20L})
+        });
+
+        Expr mixedArithmetic = new BinaryExpr(
+                new ColumnRef("c_int"), ArithmeticOp.Add, new ColumnRef("c_long"));
+
+        Expr.TypeMismatchException arithmeticError = assertThrows(
+                Expr.TypeMismatchException.class,
+                () -> ExprEvaluator.eval(mixedArithmetic, batch));
+        assertEquals("Cannot apply + to operands: left type INT32, right type INT64",
+                arithmeticError.getMessage());
+
+        Expr mixedComparison = new BinaryExpr(
+                new ColumnRef("c_int"), ComparisonOp.EqEq, new ColumnRef("c_long"));
+
+        Expr.TypeMismatchException comparisonError = assertThrows(
+                Expr.TypeMismatchException.class,
+                () -> ExprEvaluator.eval(mixedComparison, batch));
+        assertEquals("Cannot compare operands for ==: left type INT32, right type INT64",
+                comparisonError.getMessage());
     }
 
     @Test
@@ -189,8 +265,8 @@ class ExprEvaluatorTest {
         Expr andExpr = new LogicalExpr(new ColumnRef("a"), LogicalOp.AND, new ColumnRef("b"));
         Expr orExpr = new LogicalExpr(new ColumnRef("a"), LogicalOp.OR, new ColumnRef("b"));
 
-        Vector.BoolVec andResult = (Vector.BoolVec) ExprEvaluator.eval(andExpr, batch);
-        Vector.BoolVec orResult = (Vector.BoolVec) ExprEvaluator.eval(orExpr, batch);
+        BoolVec andResult = (BoolVec) ExprEvaluator.eval(andExpr, batch);
+        BoolVec orResult = (BoolVec) ExprEvaluator.eval(orExpr, batch);
 
         // Core requirement 1: false AND null is false and valid
         assertFalse(andResult.isNull(0), "false AND null must be valid");
@@ -215,82 +291,6 @@ class ExprEvaluatorTest {
         assertTrue(orResult.isNull(5), "false OR null must be invalid (null)");
         assertTrue(andResult.isNull(6), "null AND null must be invalid (null)");
         assertTrue(orResult.isNull(7), "null OR null must be invalid (null)");
-    }
-
-    private static void assertVectorsEqualSlotForSlot(Vector expected, List<Vector> pieces) {
-        int totalLength = pieces.stream().mapToInt(Vector::length).sum();
-        assertEquals(expected.length(), totalLength, "Total length across pieces must equal single batch length");
-
-        int globalRow = 0;
-        for (Vector piece : pieces) {
-            for (int localRow = 0; localRow < piece.length(); localRow++) {
-                assertEquals(expected.isNull(globalRow), piece.isNull(localRow),
-                        "Nullness mismatch at global row " + globalRow);
-
-                if (!expected.isNull(globalRow)) {
-                    switch (expected) {
-                        case IntVec exp when piece instanceof IntVec act ->
-                                assertEquals(exp.value(globalRow), act.value(localRow),
-                                        "Int value mismatch at global row " + globalRow);
-                        case Vector.LongVec exp when piece instanceof Vector.LongVec act ->
-                                assertEquals(exp.value(globalRow), act.value(localRow),
-                                        "Long value mismatch at global row " + globalRow);
-                        case DoubleVec exp when piece instanceof DoubleVec act ->
-                                assertEquals(exp.value(globalRow), act.value(localRow), 1e-9,
-                                        "Double value mismatch at global row " + globalRow);
-                        case Vector.BoolVec exp when piece instanceof Vector.BoolVec act ->
-                                assertEquals(exp.value(globalRow), act.value(localRow),
-                                        "Boolean value mismatch at global row " + globalRow);
-                        case Vector.Utf8Vec exp when piece instanceof Vector.Utf8Vec act ->
-                                assertEquals(exp.value(globalRow), act.value(localRow),
-                                        "String value mismatch at global row " + globalRow);
-                        default -> fail("Unexpected vector type: " + expected.getClass());
-                    }
-                }
-                globalRow++;
-            }
-        }
-    }
-
-    @Test
-    @DisplayName("Invariant 5: Evaluator rejects mixed types with TypeMismatchException")
-    void rejectsMixedTypeEvaluationWithDetails() {
-        Schema schema = Schema.from(List.of(
-                new Field("c_int", Scalar.INT32, true),
-                new Field("c_long", Scalar.INT64, true)
-        ));
-        RecordBatch batch = new RecordBatch(schema, new Vector[]{
-                Vectors.intVector(new int[]{1, 2}),
-                Vectors.longVector(new long[]{10L, 20L})
-        });
-
-        Expr mixedArithmetic = new BinaryExpr(
-                new ColumnRef("c_int"), ArithmeticOp.Add, new ColumnRef("c_long"));
-
-        Expr.TypeMismatchException arithmeticError = assertThrows(
-                Expr.TypeMismatchException.class,
-                () -> ExprEvaluator.eval(mixedArithmetic, batch));
-        assertEquals("Cannot apply + to operands: left type INT32, right type INT64",
-                arithmeticError.getMessage());
-
-        Expr mixedComparison = new BinaryExpr(
-                new ColumnRef("c_int"), ComparisonOp.EqEq, new ColumnRef("c_long"));
-
-        Expr.TypeMismatchException comparisonError = assertThrows(
-                Expr.TypeMismatchException.class,
-                () -> ExprEvaluator.eval(mixedComparison, batch));
-        assertEquals("Cannot compare operands for ==: left type INT32, right type INT64",
-                comparisonError.getMessage());
-    }
-
-    private static List<Boolean> readNonNullBools(Vector.BoolVec vec) {
-        var list = new ArrayList<Boolean>();
-        for (int i = 0; i < vec.length(); i++) {
-            if (vec.isNotNull(i)) {
-                list.add(vec.value(i));
-            }
-        }
-        return List.copyOf(list);
     }
 
     @Test

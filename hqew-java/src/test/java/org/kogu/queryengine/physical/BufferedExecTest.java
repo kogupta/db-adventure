@@ -9,10 +9,9 @@ import org.kogu.queryengine.type.Field;
 import org.kogu.queryengine.type.Schema;
 import org.kogu.queryengine.type.Type;
 
-import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Queue;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -150,18 +149,19 @@ class BufferedExecTest {
     }
 
     private static class FakeBufferedExec extends BufferedExec {
-        private final Queue<@Nullable RecordBatch> pulls;
+        private final List<@Nullable RecordBatch> responses;
+        private int cursor = 0;
         private int pullCount = 0;
 
         FakeBufferedExec(Schema schema, List<@Nullable RecordBatch> responses) {
             super(schema);
-            this.pulls = new ArrayDeque<>(responses);
+            this.responses = new ArrayList<>(responses);
         }
 
         @Override
         protected @Nullable RecordBatch pull() {
             pullCount++;
-            return pulls.isEmpty() ? null : pulls.poll();
+            return cursor < responses.size() ? responses.get(cursor++) : null;
         }
 
         int pullCount() {

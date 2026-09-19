@@ -17,16 +17,16 @@ public final class Vectors {
         return new IntVec.IntVector(values, 0, values.length, nullIndices);
     }
 
-    public static Vector.LongVector longVector(long[] values) {
-        return new Vector.LongVector(values, 0, values.length, new BitSet());
+    public static LongVec.LongVector longVector(long[] values) {
+        return new LongVec.LongVector(values, 0, values.length, new BitSet());
     }
 
-    public static Vector.LongVector longVector(long[] values, int offset, int length) {
-        return new Vector.LongVector(values, offset, length, new BitSet());
+    public static LongVec.LongVector longVector(long[] values, int offset, int length) {
+        return new LongVec.LongVector(values, offset, length, new BitSet());
     }
 
-    public static Vector.LongVector longVector(long[] values, BitSet nullIndices) {
-        return new Vector.LongVector(values, 0, values.length, nullIndices);
+    public static LongVec.LongVector longVector(long[] values, BitSet nullIndices) {
+        return new LongVec.LongVector(values, 0, values.length, nullIndices);
     }
 
     public static DoubleVec.DoubleVector doubleVector(double[] values) {
@@ -41,27 +41,27 @@ public final class Vectors {
         return new DoubleVec.DoubleVector(values, 0, values.length, nullIndices);
     }
 
-    public static Vector.StringVector stringVector(String[] values, BitSet nullIndices) {
-        return new Vector.StringVector(values, 0, values.length, nullIndices);
+    public static Utf8Vec.StringVector stringVector(String[] values, BitSet nullIndices) {
+        return new Utf8Vec.StringVector(values, 0, values.length, nullIndices);
     }
 
-    public static Vector.StringVector stringVector(String[] values) {
-        return new Vector.StringVector(values, 0, values.length, new BitSet());
+    public static Utf8Vec.StringVector stringVector(String[] values) {
+        return new Utf8Vec.StringVector(values, 0, values.length, new BitSet());
     }
 
-    public static Vector.StringVector stringVector(String[] values, int offset, int length) {
-        return new Vector.StringVector(values, offset, length, new BitSet());
+    public static Utf8Vec.StringVector stringVector(String[] values, int offset, int length) {
+        return new Utf8Vec.StringVector(values, offset, length, new BitSet());
     }
 
-    public static Vector.BooleanVector booleanVector(boolean[] values) {
-        return new Vector.BooleanVector(values, 0, values.length, new BitSet());
+    public static BoolVec.BooleanVector booleanVector(boolean[] values) {
+        return new BoolVec.BooleanVector(values, 0, values.length, new BitSet());
     }
 
-    public static Vector.BooleanVector booleanVector(boolean[] values, int offset, int length) {
-        return new Vector.BooleanVector(values, offset, length, new BitSet());
+    public static BoolVec.BooleanVector booleanVector(boolean[] values, int offset, int length) {
+        return new BoolVec.BooleanVector(values, offset, length, new BitSet());
     }
 
-    public static Vector.BooleanVector booleanVector(boolean[] values, BitSet nullIndices) {
-        return new Vector.BooleanVector(values, 0, values.length, nullIndices);
+    public static BoolVec.BooleanVector booleanVector(boolean[] values, BitSet nullIndices) {
+        return new BoolVec.BooleanVector(values, 0, values.length, nullIndices);
     }
 }

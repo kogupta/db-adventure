@@ -41,7 +41,7 @@ class VectorTest {
 
     @Test
     void longVectorReadsAWindowFromItsBackingArray() {
-        Vector.LongVector vector = Vectors.longVector(new long[]{9L, 10L, 20L, 30L, 99L}, 1, 3);
+        LongVec.LongVector vector = Vectors.longVector(new long[]{9L, 10L, 20L, 30L, 99L}, 1, 3);
 
         assertEquals(3, vector.length());
         assertEquals(Type.Scalar.INT64, vector.type());
@@ -54,7 +54,7 @@ class VectorTest {
 
     @Test
     void longVectorReadsValuesAndRejectsInvalidWindowsAndIndexes() {
-        Vector.LongVector vector = Vectors.longVector(new long[]{1L, 2L, 3L, 4L, 5L}, 0, 5);
+        LongVec.LongVector vector = Vectors.longVector(new long[]{1L, 2L, 3L, 4L, 5L}, 0, 5);
         assertEquals(1L, vector.value(0));
         assertEquals(5L, vector.value(4));
         assertThrows(IndexOutOfBoundsException.class, () -> vector.value(5));
@@ -83,7 +83,7 @@ class VectorTest {
 
     @Test
     void booleanVectorReadsAWindowFromItsBackingArray() {
-        Vector.BooleanVector vector = Vectors.booleanVector(new boolean[]{true, false, true, false, true}, 1, 3);
+        BoolVec.BooleanVector vector = Vectors.booleanVector(new boolean[]{true, false, true, false, true}, 1, 3);
 
         assertEquals(3, vector.length());
         assertEquals(Type.Scalar.BOOLEAN, vector.type());
@@ -96,7 +96,7 @@ class VectorTest {
 
     @Test
     void booleanVectorReadsValuesAndRejectsInvalidWindowsAndIndexes() {
-        Vector.BooleanVector vector = Vectors.booleanVector(new boolean[]{true, false, true, false, true}, 0, 5);
+        BoolVec.BooleanVector vector = Vectors.booleanVector(new boolean[]{true, false, true, false, true}, 0, 5);
         assertTrue(vector.value(0));
         assertTrue(vector.value(4));
         assertThrows(IndexOutOfBoundsException.class, () -> vector.value(5));
@@ -104,7 +104,7 @@ class VectorTest {
 
     @Test
     void stringVectorReadsAWindowFromItsBackingArray() {
-        Vector.StringVector vector = Vectors.stringVector(new String[]{"a", "b", "c", "d", "e"}, 1, 3);
+        Utf8Vec.StringVector vector = Vectors.stringVector(new String[]{"a", "b", "c", "d", "e"}, 1, 3);
 
         assertEquals(3, vector.length());
         assertEquals(Type.Scalar.UTF8, vector.type());
@@ -117,7 +117,7 @@ class VectorTest {
 
     @Test
     void stringVectorReadsValuesAndRejectsInvalidWindowsAndIndexes() {
-        Vector.StringVector vector = Vectors.stringVector(new String[]{"a", "b", "c", "d", "e"}, 0, 5);
+        Utf8Vec.StringVector vector = Vectors.stringVector(new String[]{"a", "b", "c", "d", "e"}, 0, 5);
         assertEquals("a", vector.value(0));
         assertEquals("e", vector.value(4));
         assertThrows(IndexOutOfBoundsException.class, () -> vector.value(5));
@@ -146,20 +146,20 @@ class VectorTest {
                     assertEquals(new IntVec.ConstantInt(7, 3), gathered);
                 },
                 () -> {
-                    Vector.LongVec gathered = new Vector.ConstantLong(7L, 100).gather(new int[]{0, 5, 99});
-                    assertEquals(new Vector.ConstantLong(7L, 3), gathered);
+                    LongVec gathered = new LongVec.ConstantLong(7L, 100).gather(new int[]{0, 5, 99});
+                    assertEquals(new LongVec.ConstantLong(7L, 3), gathered);
                 },
                 () -> {
                     DoubleVec gathered = new DoubleVec.ConstantDouble(7.0, 100).gather(new int[]{0, 5, 99});
                     assertEquals(new DoubleVec.ConstantDouble(7.0, 3), gathered);
                 },
                 () -> {
-                    Vector.BoolVec gathered = new Vector.ConstantBool(true, 100).gather(new int[]{0, 5, 99});
-                    assertEquals(new Vector.ConstantBool(true, 3), gathered);
+                    BoolVec gathered = new BoolVec.ConstantBool(true, 100).gather(new int[]{0, 5, 99});
+                    assertEquals(new BoolVec.ConstantBool(true, 3), gathered);
                 },
                 () -> {
-                    Vector.Utf8Vec gathered = new Vector.ConstantUtf8("seven", 100).gather(new int[]{0, 5, 99});
-                    assertEquals(new Vector.ConstantUtf8("seven", 3), gathered);
+                    Utf8Vec gathered = new Utf8Vec.ConstantUtf8("seven", 100).gather(new int[]{0, 5, 99});
+                    assertEquals(new Utf8Vec.ConstantUtf8("seven", 3), gathered);
                 });
     }
 

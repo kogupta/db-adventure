@@ -1,16 +1,18 @@
 package org.kogu.queryengine.expression;
 
-import java.util.BitSet;
-import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.kogu.queryengine.expression.Expr.*;
+import org.kogu.queryengine.columnar.BoolVec;
 import org.kogu.queryengine.columnar.RecordBatch;
 import org.kogu.queryengine.columnar.Vector;
 import org.kogu.queryengine.columnar.Vectors;
+import org.kogu.queryengine.expression.Expr.LogicalOp;
 import org.kogu.queryengine.type.Field;
 import org.kogu.queryengine.type.Schema;
 import org.kogu.queryengine.type.Type.Scalar;
+
+import java.util.BitSet;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -68,7 +70,7 @@ class ExprTracerTest {
         ExprTracer.TraceStep step3 = report.steps().get(2);
         assertEquals(3, step3.stepNumber());
         assertEquals(List.of(1, 2), step3.inputStepNumbers());
-        assertInstanceOf(Vector.BoolVec.class, step3.resultVector());
+        assertInstanceOf(BoolVec.class, step3.resultVector());
         assertTrue(step3.resultVector().isNull(2));
         assertTrue(step3.resultVector().isNull(7));
 
@@ -100,7 +102,7 @@ class ExprTracerTest {
         // row 5: false AND null -> false, valid (3VL false dominates!)
         // row 6: true AND true -> true, valid
         // row 7: null AND false -> false, valid (3VL false dominates!)
-        Vector.BoolVec finalVec = (Vector.BoolVec) report.finalResult();
+        BoolVec finalVec = (BoolVec) report.finalResult();
         assertEquals(8, finalVec.length());
         assertFalse(finalVec.isNull(0));
         assertFalse(finalVec.value(0));

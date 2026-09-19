@@ -326,7 +326,7 @@ The block between BEGIN_MUTABLE_STATE and END_MUTABLE_STATE is rewritten in plac
 #+begin_src clojure
 {:state-version 1
  :course-status :in-progress
- :position {:unit "qe.11.filter-exec" :stage "stage-2" :checkpoint nil :status :in-progress}
+ :position {:unit "qe.12.limit-exec" :stage "stage-2" :checkpoint nil :status :in-progress}
  :environment {:language :java :jdk 25 :build-tool :maven :repo-root "hqew-java" :test-framework :junit-5}
  :mastery {"qe.00.orientation" :demonstrated
            "qe.01.row-vs-column" :demonstrated
@@ -339,7 +339,8 @@ The block between BEGIN_MUTABLE_STATE and END_MUTABLE_STATE is rewritten in plac
            "qe.08.operator-contract" :demonstrated
            "qe.09.memory-scan" :demonstrated
            "qe.10.project-exec" :demonstrated
-           "qe.11.filter-exec" :working}
+           "qe.11.filter-exec" :demonstrated
+           "qe.12.limit-exec" :working}
  :implementation
  {:capabilities
   ["lesson1 Main: graduation-query shape (filter->group->avg->sort desc) over both row objects and parallel int[] columns; equivalence test passes (rowEval/columnEval)"
@@ -350,14 +351,14 @@ The block between BEGIN_MUTABLE_STATE and END_MUTABLE_STATE is rewritten in plac
    "Expr AST: sealed interface (ColumnRef, typed Literal records, BinaryExpr/UnaryExpr/LogicalExpr), outputType(Schema) returns ExprType(Type, nullable), recursive type rules deliberately reject mixed widths, collectReferences reports dependencies, and TypeMismatchException carries operand/operator details; nine parameterized cases pin type and nullability propagation"
    "QE-06 completion: expression = per-row scalar function (never changes row count); operator = relation-to-relation (row count/schema changes); distinction articulated"
    "qe.07 semantics settled before code: expression = map (8->8), filter operator = filter (8->5), aggregate = fold (8->1); comparison/arithmetic validity = AND of input validities; AND/OR need three-valued logic with a dominant value (false dominates AND, true dominates OR) so those kernels must read values even at invalid slots"
-   "Vector is now a 3-level hierarchy: Vector (sealed) -> element-type interfaces IntVec/LongVec/DoubleVec/BoolVec/Utf8Vec (each declares value(int) and a default type()) -> storage records (windowed array vector, or Constant* with no BitSet). Kernels name element type only, so constant-vs-windowed storage never reaches a switch arm. offset() and nullIndices() are off the interface; isNull(int) is the whole null contract"
+   "Vector is now a 3-level hierarchy: Vector (sealed) -> top-level element-type interfaces IntVec/LongVec/DoubleVec/BoolVec/Utf8Vec (each declares value(int) and a default type()) -> storage records (windowed array vector, or Constant* with no BitSet). Kernels name element type only, so constant-vs-windowed storage never reaches a switch arm. offset() and nullIndices() are off the interface; isNull(int) is the whole null contract"
    "ExprEvaluatorTest: 4 behavioral checks green (45 tests total) — length == rowCount over 26 expression shapes; GT over a null-bearing batch; the full 3VL AND/OR table including both-null; boundary invisibility across one 8-row batch against windows of 3+3+2, covering arithmetic, comparison, and a compound AND with a literal operand"
    "ExprEvaluator: static eval(Expr, RecordBatch) -> Vector. ColumnRef returns the batch vector unchanged, literals build Constant*, arithmetic/comparison dispatch one arm per element type, 3VL AND/OR/NOT correct including the both-null case; kernels share a perSlot(bothNonNull, writeSlot, length) driver"
    "qe.07 ExprEvaluator tests: pins rowCount preservation across all AST shapes, null propagation with differing-junk invariance on trip_distance > 5, 3VL short-circuit (false AND null / true OR null), boundary invisibility (8-row batch vs 3+3+2 concatenated), and mixed-type rejection (TypeMismatchException)"]
    "qe.08 operator contract: Exec exposes stable schema plus @Nullable RecordBatch next(); BufferedExec final next() skips zero-row batches, latches permanent exhaustion, and prevents pulls after EOF; null is the single exhaustion sentinel and 9 focused execution tests pass"
    "qe.09 MemoryScanExec: top-level physical operator; deterministic in-memory source preserves supplied batch order; BufferedExec enforces zero-row suppression and permanent exhaustion; 14 focused tests pass"
    "qe.10 ProjectExec: top-level unary physical operator accepts ordered Projection(name, expression) items; derives output schema before execution, reuses ColumnRef vectors, evaluates derived expressions through ExprEvaluator, preserves row counts and input batch boundaries, propagates nulls, and rejects empty/duplicate projections; four focused tests were added"
-   "qe.11 gather abstraction: Vector.gather(Vector, int[]) dispatches to per-element-type default gather(rows) that copies selected values and remaps null validity; Constant* records override gather to return the same constant with rows.length, giving O(1) deferred materialization instead of per-row copies; FilterExec uses mask.isNotNull && value survivor selection plus Vector.gather per column"
+   "qe.11 gather abstraction: Vector.gather(Vector, int[]) dispatches to per-element-type default gather(rows) that copies selected values and remaps null validity; Constant* records override gather to return the same constant with rows.length, giving O(1) deferred materialization instead of per-row copies; FilterExec uses mask.isNotNull && value survivor selection plus Vector.gather per column; FilterExecTest covers all/some/none survivors, null predicates, multi-batch continuation, payload null remapping, boolean predicate validation, and constant payload preservation"
    "Default Maven compiler configuration runs Error Prone NullAway in JSpecify mode for annotated project packages; `mvn clean test` passes 85 tests with zero failures and zero errors"
   :current-design ["Package boundaries are type, columnar, expression, and physical under lowercase org.kogu.queryengine; physical operators are top-level classes beside Exec/BufferedExec; Type as sealed interface chosen over enum for future nested types; expression and vector metadata use Type plus independent nullability, while composite vectors and composite operator semantics are deferred until a query requires them; Schema stores LinkedHashMap name->field; Vector contract mechanism-free; nulls are data not holes; batch boundaries are execution detail; Expr type rules reject mixed widths deliberately (INT32+INT64 rejected until a query forces coercion)"]
   :known-correctness-gaps
@@ -382,7 +383,7 @@ The block between BEGIN_MUTABLE_STATE and END_MUTABLE_STATE is rewritten in plac
   {:id "D-010" :decision "Use lowercase org.kogu.queryengine with type, columnar, expression, and physical packages; keep physical operators as top-level classes." :reason "Package boundaries expose dependency direction and avoid types/exec/utils grab bags as the engine grows."}
   {:id "D-011" :decision "Run Error Prone NullAway in the default Maven compiler configuration using JSpecify mode." :reason "Nullness checking must be part of ordinary builds rather than an optional profile; the repository already declares JSpecify, Error Prone, and NullAway."}
   {:id "D-012" :decision "gather(rows) lives on element-type interfaces with array-expanding defaults; Constant* overrides return the same constant at rows.length." :reason "Gathering from a constant never needs the indices' values, so selection stays O(1) and constant columns stay deferred (extends D-006) instead of being force-expanded at operator boundaries."}]
- :next-action "qe.11 entry probe: for predicate mask [TRUE, FALSE, null, TRUE], predict which rows survive; then decide whether a batch with zero surviving rows should cross next() or trigger another child pull."
+ :next-action "qe.12 entry probe: LIMIT 5 receives child batches of 3, 4, and 4 rows. Predict how many rows are returned, how many child batches are requested, and which batch rows are never pulled."
 #+end_src
 # END_MUTABLE_STATE
 

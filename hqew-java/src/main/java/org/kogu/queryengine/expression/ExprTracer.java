@@ -1,9 +1,6 @@
 package org.kogu.queryengine.expression;
 
-import org.kogu.queryengine.columnar.DoubleVec;
-import org.kogu.queryengine.columnar.IntVec;
-import org.kogu.queryengine.columnar.RecordBatch;
-import org.kogu.queryengine.columnar.Vector;
+import org.kogu.queryengine.columnar.*;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -125,10 +122,10 @@ final class ExprTracer {
             } else {
                 switch (vector) {
                     case IntVec v -> values.add(String.valueOf(v.value(i)));
-                    case Vector.LongVec v -> values.add(String.valueOf(v.value(i)));
+                    case LongVec v -> values.add(String.valueOf(v.value(i)));
                     case DoubleVec v -> values.add(String.valueOf(v.value(i)));
-                    case Vector.BoolVec v -> values.add(String.valueOf(v.value(i)));
-                    case Vector.Utf8Vec v -> values.add("\"" + v.value(i) + "\"");
+                    case BoolVec v -> values.add(String.valueOf(v.value(i)));
+                    case Utf8Vec v -> values.add("\"" + v.value(i) + "\"");
                 }
             }
         }

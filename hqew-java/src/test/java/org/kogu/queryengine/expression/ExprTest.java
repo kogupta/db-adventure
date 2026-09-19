@@ -235,29 +235,29 @@ class ExprTest {
         assertEquals(10, intDiv.value(3));
 
         // INT64
-        Vector.LongVec longLeft = Vectors.longVector(new long[]{0L, 100L, 200L, 300L}, leftNulls);
-        Vector.LongVec longRight = Vectors.longVector(new long[]{5L, 0L, 4L, 3L}, rightNulls);
+        LongVec longLeft = Vectors.longVector(new long[]{0L, 100L, 200L, 300L}, leftNulls);
+        LongVec longRight = Vectors.longVector(new long[]{5L, 0L, 4L, 3L}, rightNulls);
         Schema longSchema = Schema.from(List.of(
                 new Field("a", Scalar.INT64, true),
                 new Field("b", Scalar.INT64, true)));
         RecordBatch longBatch = new RecordBatch(longSchema, new Vector[]{longLeft, longRight});
 
-        Vector.LongVector longAdd = (Vector.LongVector) ExprEvaluator.eval(
+        LongVec.LongVector longAdd = (LongVec.LongVector) ExprEvaluator.eval(
                 new BinaryExpr(new ColumnRef("a"), ArithmeticOp.Add, new ColumnRef("b")), longBatch);
         assertTrue(longAdd.isNull(0));
         assertTrue(longAdd.isNull(1));
         assertEquals(204L, longAdd.value(2));
         assertEquals(303L, longAdd.value(3));
 
-        Vector.LongVector longSub = (Vector.LongVector) ExprEvaluator.eval(
+        LongVec.LongVector longSub = (LongVec.LongVector) ExprEvaluator.eval(
                 new BinaryExpr(new ColumnRef("a"), ArithmeticOp.Subtract, new ColumnRef("b")), longBatch);
         assertEquals(196L, longSub.value(2));
 
-        Vector.LongVector longMul = (Vector.LongVector) ExprEvaluator.eval(
+        LongVec.LongVector longMul = (LongVec.LongVector) ExprEvaluator.eval(
                 new BinaryExpr(new ColumnRef("a"), ArithmeticOp.Multiply, new ColumnRef("b")), longBatch);
         assertEquals(800L, longMul.value(2));
 
-        Vector.LongVector longDiv = (Vector.LongVector) ExprEvaluator.eval(
+        LongVec.LongVector longDiv = (LongVec.LongVector) ExprEvaluator.eval(
                 new BinaryExpr(new ColumnRef("a"), ArithmeticOp.Divide, new ColumnRef("b")), longBatch);
         assertEquals(50L, longDiv.value(2));
 

@@ -7,7 +7,13 @@ import java.util.BitSet;
 import java.util.function.IntConsumer;
 import java.util.function.IntPredicate;
 
-import static org.kogu.queryengine.columnar.Vector.*;
+import static org.kogu.queryengine.columnar.BoolVec.ConstantBool;
+import static org.kogu.queryengine.columnar.DoubleVec.ConstantDouble;
+import static org.kogu.queryengine.columnar.DoubleVec.DoubleVector;
+import static org.kogu.queryengine.columnar.IntVec.ConstantInt;
+import static org.kogu.queryengine.columnar.IntVec.IntVector;
+import static org.kogu.queryengine.columnar.LongVec.ConstantLong;
+import static org.kogu.queryengine.columnar.LongVec.LongVector;
 
 public final class ExprEvaluator {
     private ExprEvaluator() {}
@@ -15,10 +21,10 @@ public final class ExprEvaluator {
     public static Vector eval(Expr expr, RecordBatch batch) {
         return switch (expr) {
             case ColumnRef(var name) -> batch.vectorOf(name);
-            case Literal.Int32(var n) -> new IntVec.ConstantInt(n, batch.rowCount());
+            case Literal.Int32(var n) -> new ConstantInt(n, batch.rowCount());
             case Literal.Int64(var n) -> new ConstantLong(n, batch.rowCount());
-            case Literal.Float64(var d) -> new DoubleVec.ConstantDouble(d, batch.rowCount());
-            case Literal.Str(var s) -> new ConstantUtf8(s, batch.rowCount());
+            case Literal.Float64(var d) -> new ConstantDouble(d, batch.rowCount());
+            case Literal.Str(var s) -> new Utf8Vec.ConstantUtf8(s, batch.rowCount());
             case Literal.Bool bool -> new ConstantBool(bool.value, batch.rowCount());
             case BinaryExpr(var left, var op, var right) -> {
                 Vector a = eval(left, batch);
@@ -40,8 +46,8 @@ public final class ExprEvaluator {
         };
     }
 
-    private static BooleanVector evalLogical(RecordBatch batch, LogicalOp op, BoolVec left,
-                                             BoolVec right) {
+    private static BoolVec.BooleanVector evalLogical(RecordBatch batch, LogicalOp op, BoolVec left,
+                                                     BoolVec right) {
         boolean[] result = new boolean[batch.rowCount()];
         BitSet nulls = new BitSet(batch.rowCount());
 
@@ -73,7 +79,7 @@ public final class ExprEvaluator {
             nulls.set(index);
     }
 
-    private static BooleanVector evalUnary(RecordBatch batch, Expr.UnaryOp op, Expr e) {
+    private static BoolVec.BooleanVector evalUnary(RecordBatch batch, Expr.UnaryOp op, Expr e) {
         Vector v = eval(e, batch);
 
         if (!(v instanceof BoolVec bs) || op != Expr.UnaryOp.NOT) {
@@ -119,7 +125,7 @@ public final class ExprEvaluator {
     }
 
     /// ----- nearly identical methods ----
-    private static IntVec.IntVector numericInts(IntVec left, ArithmeticOp op, IntVec right) {
+    private static IntVector numericInts(IntVec left, ArithmeticOp op, IntVec right) {
         int[] result = new int[left.length()];
         BitSet nulls = perSlot(
                 i -> left.isNotNull(i) && right.isNotNull(i),
@@ -137,7 +143,7 @@ public final class ExprEvaluator {
         return Vectors.longVector(result, nulls);
     }
 
-    private static DoubleVec.DoubleVector numericDoubles(DoubleVec left, ArithmeticOp op, DoubleVec right) {
+    private static DoubleVector numericDoubles(DoubleVec left, ArithmeticOp op, DoubleVec right) {
         double[] result = new double[left.length()];
         BitSet nulls = perSlot(
                 i -> left.isNotNull(i) && right.isNotNull(i),
@@ -161,7 +167,7 @@ public final class ExprEvaluator {
 
     /// One kernel per element type. int[]/long[]/double[] share no supertype, and a common
     /// signature would box every slot, so the repetition stays.
-    private static BooleanVector compareInts(IntVec left, ComparisonOp op, IntVec right) {
+    private static BoolVec.BooleanVector compareInts(IntVec left, ComparisonOp op, IntVec right) {
         boolean[] result = new boolean[left.length()];
         BitSet nulls = perSlot(
                 i -> left.isNotNull(i) && right.isNotNull(i),
@@ -170,7 +176,7 @@ public final class ExprEvaluator {
         return Vectors.booleanVector(result, nulls);
     }
 
-    private static BooleanVector compareLongs(LongVec left, ComparisonOp op, LongVec right) {
+    private static BoolVec.BooleanVector compareLongs(LongVec left, ComparisonOp op, LongVec right) {
         boolean[] result = new boolean[left.length()];
         BitSet nulls = perSlot(
                 i -> left.isNotNull(i) && right.isNotNull(i),
@@ -179,7 +185,7 @@ public final class ExprEvaluator {
         return Vectors.booleanVector(result, nulls);
     }
 
-    private static BooleanVector compareDoubles(DoubleVec left, ComparisonOp op, DoubleVec right) {
+    private static BoolVec.BooleanVector compareDoubles(DoubleVec left, ComparisonOp op, DoubleVec right) {
         boolean[] result = new boolean[left.length()];
         BitSet nulls = perSlot(
                 i -> left.isNotNull(i) && right.isNotNull(i),
@@ -188,7 +194,7 @@ public final class ExprEvaluator {
         return Vectors.booleanVector(result, nulls);
     }
 
-    private static BooleanVector compareBools(BoolVec left, ComparisonOp op, BoolVec right) {
+    private static BoolVec.BooleanVector compareBools(BoolVec left, ComparisonOp op, BoolVec right) {
         boolean[] result = new boolean[left.length()];
         BitSet nulls = perSlot(
                 i -> left.isNotNull(i) && right.isNotNull(i),
@@ -197,7 +203,7 @@ public final class ExprEvaluator {
         return Vectors.booleanVector(result, nulls);
     }
 
-    private static BooleanVector compareUtf8(Utf8Vec left, ComparisonOp op, Utf8Vec right) {
+    private static BoolVec.BooleanVector compareUtf8(Utf8Vec left, ComparisonOp op, Utf8Vec right) {
         boolean[] result = new boolean[left.length()];
         BitSet nulls = perSlot(
                 i -> left.isNotNull(i) && right.isNotNull(i),

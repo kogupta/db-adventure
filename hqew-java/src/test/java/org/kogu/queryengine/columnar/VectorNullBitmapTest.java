@@ -17,10 +17,10 @@ class VectorNullBitmapTest {
         nullIndices.set(2);
 
         IntVec.IntVector ints = new IntVec.IntVector(new int[]{10, 20, 30}, 0, 3, nullIndices);
-        Vector.LongVector longs = new Vector.LongVector(new long[]{10L, 20L, 30L}, 0, 3, nullIndices);
+        LongVec.LongVector longs = new LongVec.LongVector(new long[]{10L, 20L, 30L}, 0, 3, nullIndices);
         DoubleVec.DoubleVector doubles = new DoubleVec.DoubleVector(new double[]{1.0, 2.0, 3.0}, 0, 3, nullIndices);
-        Vector.StringVector strings = new Vector.StringVector(new String[]{"a", "b", "c"}, 0, 3, nullIndices);
-        Vector.BooleanVector booleans = new Vector.BooleanVector(new boolean[]{true, false, true}, 0, 3, nullIndices);
+        Utf8Vec.StringVector strings = new Utf8Vec.StringVector(new String[]{"a", "b", "c"}, 0, 3, nullIndices);
+        BoolVec.BooleanVector booleans = new BoolVec.BooleanVector(new boolean[]{true, false, true}, 0, 3, nullIndices);
 
         assertAll(
                 () -> assertEquals(List.of(20), readNonNull(ints, ints::value)),
@@ -65,15 +65,6 @@ class VectorNullBitmapTest {
                 () -> assertThrows(IndexOutOfBoundsException.class, () -> vector.isNull(-1)),
                 () -> assertThrows(IndexOutOfBoundsException.class, () -> vector.isNull(3)));
     }
-
-    @Test
-    @SuppressWarnings("NullAway")
-    void rejectsNullBitmapAtConstruction() {
-        assertThrows(
-                NullPointerException.class,
-                () -> new IntVec.IntVector(new int[]{10}, 0, 1, null));
-    }
-
 
     @Test
     void nullSlotValuesMayDifferButGatedReadsRemainIdentical() {

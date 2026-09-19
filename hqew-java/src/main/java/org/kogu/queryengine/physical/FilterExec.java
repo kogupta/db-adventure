@@ -1,6 +1,7 @@
 package org.kogu.queryengine.physical;
 
 import org.jspecify.annotations.Nullable;
+import org.kogu.queryengine.columnar.BoolVec;
 import org.kogu.queryengine.columnar.RecordBatch;
 import org.kogu.queryengine.columnar.Vector;
 import org.kogu.queryengine.expression.Expr;
@@ -34,7 +35,7 @@ public final class FilterExec extends BufferedExec {
             var batch = child.next();
             if (batch == null) return null;
 
-            Vector.BoolVec mask = (Vector.BoolVec) ExprEvaluator.eval(predicate, batch);
+            BoolVec mask = (BoolVec) ExprEvaluator.eval(predicate, batch);
             Schema schema = schema();
             int length = mask.length();
 
