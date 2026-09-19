@@ -1,5 +1,7 @@
 package org.kogu.queryengine.expression;
 
+import org.kogu.queryengine.columnar.DoubleVec;
+import org.kogu.queryengine.columnar.IntVec;
 import org.kogu.queryengine.columnar.RecordBatch;
 import org.kogu.queryengine.columnar.Vector;
 
@@ -122,9 +124,9 @@ final class ExprTracer {
                 values.add("null");
             } else {
                 switch (vector) {
-                    case Vector.IntVec v -> values.add(String.valueOf(v.value(i)));
+                    case IntVec v -> values.add(String.valueOf(v.value(i)));
                     case Vector.LongVec v -> values.add(String.valueOf(v.value(i)));
-                    case Vector.DoubleVec v -> values.add(String.valueOf(v.value(i)));
+                    case DoubleVec v -> values.add(String.valueOf(v.value(i)));
                     case Vector.BoolVec v -> values.add(String.valueOf(v.value(i)));
                     case Vector.Utf8Vec v -> values.add("\"" + v.value(i) + "\"");
                 }

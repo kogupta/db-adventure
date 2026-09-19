@@ -68,24 +68,7 @@
                 <configuration>
                     <compilerArgs>
                         <arg>--enable-preview</arg>
-                        <arg>-XDcompilePolicy=simple</arg>
-                        <arg>--should-stop=ifError=FLOW</arg>
-                        <arg>-Xplugin:ErrorProne -XepDisableAllChecks -Xep:NullAway:ERROR
-                            -XepOpt:NullAway:AnnotatedPackages=org.kogu,io.andygrove -XepOpt:NullAway:JSpecifyMode=true
-                        </arg>
                     </compilerArgs>
-                    <annotationProcessorPaths>
-                        <path>
-                            <groupId>com.google.errorprone</groupId>
-                            <artifactId>error_prone_core</artifactId>
-                            <version>${error-prone.version}</version>
-                        </path>
-                        <path>
-                            <groupId>com.uber.nullaway</groupId>
-                            <artifactId>nullaway</artifactId>
-                            <version>${nullaway.version}</version>
-                        </path>
-                    </annotationProcessorPaths>
                 </configuration>
             </plugin>
             <plugin>
@@ -98,5 +81,53 @@
             </plugin>
         </plugins>
     </build>
+
+    <!--
+      NullAway/ErrorProne run as a javac Xplugin, which needs error_prone_core on
+      javac's processor/plugin path. IntelliJ's JPS build cannot provide that, so
+      this config lives in a profile: active by default for every plain `mvn` run,
+      but IDEA's Maven importer can leave it unchecked (per-project workspace
+      setting, survives re-imports) so .idea/compiler.xml stays clean.
+      Requires the add-exports/add-opens flags in .mvn/jvm.config.
+    -->
+    <profiles>
+        <profile>
+            <id>nullaway</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-compiler-plugin</artifactId>
+                        <configuration>
+                            <compilerArgs>
+                                <arg>--enable-preview</arg>
+                                <arg>-XDcompilePolicy=simple</arg>
+                                <arg>--should-stop=ifError=FLOW</arg>
+                                <arg>-Xplugin:ErrorProne -XepDisableAllChecks -Xep:NullAway:ERROR
+                                    -XepOpt:NullAway:AnnotatedPackages=org.kogu,io.andygrove
+                                    -XepOpt:NullAway:JSpecifyMode=true
+                                </arg>
+                            </compilerArgs>
+                            <annotationProcessorPaths>
+                                <path>
+                                    <groupId>com.google.errorprone</groupId>
+                                    <artifactId>error_prone_core</artifactId>
+                                    <version>${error-prone.version}</version>
+                                </path>
+                                <path>
+                                    <groupId>com.uber.nullaway</groupId>
+                                    <artifactId>nullaway</artifactId>
+                                    <version>${nullaway.version}</version>
+                                </path>
+                            </annotationProcessorPaths>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
 </project>

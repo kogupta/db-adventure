@@ -1,22 +1,21 @@
 package org.kogu.queryengine.expression;
 
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+import org.kogu.queryengine.columnar.*;
+import org.kogu.queryengine.expression.Expr.LogicalOp;
+import org.kogu.queryengine.expression.Expr.UnaryOp;
+import org.kogu.queryengine.type.Field;
+import org.kogu.queryengine.type.Schema;
+import org.kogu.queryengine.type.Type.Scalar;
+
 import java.util.BitSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
-
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
-import org.kogu.queryengine.expression.Expr.*;
-import org.kogu.queryengine.columnar.RecordBatch;
-import org.kogu.queryengine.columnar.Vector;
-import org.kogu.queryengine.columnar.Vectors;
-import org.kogu.queryengine.type.Field;
-import org.kogu.queryengine.type.Schema;
-import org.kogu.queryengine.type.Type.Scalar;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -205,14 +204,14 @@ class ExprTest {
         rightNulls.set(1); // index 1 is null in right
 
         // INT32
-        Vector.IntVec intLeft = Vectors.intVector(new int[]{0, 10, 20, 30}, leftNulls);
-        Vector.IntVec intRight = Vectors.intVector(new int[]{5, 0, 4, 3}, rightNulls);
+        IntVec intLeft = Vectors.intVector(new int[]{0, 10, 20, 30}, leftNulls);
+        IntVec intRight = Vectors.intVector(new int[]{5, 0, 4, 3}, rightNulls);
         Schema intSchema = Schema.from(List.of(
                 new Field("a", Scalar.INT32, true),
                 new Field("b", Scalar.INT32, true)));
         RecordBatch intBatch = new RecordBatch(intSchema, new Vector[]{intLeft, intRight});
 
-        Vector.IntVector intAdd = (Vector.IntVector) ExprEvaluator.eval(
+        IntVec.IntVector intAdd = (IntVec.IntVector) ExprEvaluator.eval(
                 new BinaryExpr(new ColumnRef("a"), ArithmeticOp.Add, new ColumnRef("b")), intBatch);
         assertTrue(intAdd.isNull(0));
         assertTrue(intAdd.isNull(1));
@@ -220,17 +219,17 @@ class ExprTest {
         assertEquals(24, intAdd.value(2));
         assertEquals(33, intAdd.value(3));
 
-        Vector.IntVector intSub = (Vector.IntVector) ExprEvaluator.eval(
+        IntVec.IntVector intSub = (IntVec.IntVector) ExprEvaluator.eval(
                 new BinaryExpr(new ColumnRef("a"), ArithmeticOp.Subtract, new ColumnRef("b")), intBatch);
         assertEquals(16, intSub.value(2));
         assertEquals(27, intSub.value(3));
 
-        Vector.IntVector intMul = (Vector.IntVector) ExprEvaluator.eval(
+        IntVec.IntVector intMul = (IntVec.IntVector) ExprEvaluator.eval(
                 new BinaryExpr(new ColumnRef("a"), ArithmeticOp.Multiply, new ColumnRef("b")), intBatch);
         assertEquals(80, intMul.value(2));
         assertEquals(90, intMul.value(3));
 
-        Vector.IntVector intDiv = (Vector.IntVector) ExprEvaluator.eval(
+        IntVec.IntVector intDiv = (IntVec.IntVector) ExprEvaluator.eval(
                 new BinaryExpr(new ColumnRef("a"), ArithmeticOp.Divide, new ColumnRef("b")), intBatch);
         assertEquals(5, intDiv.value(2));
         assertEquals(10, intDiv.value(3));
@@ -263,29 +262,29 @@ class ExprTest {
         assertEquals(50L, longDiv.value(2));
 
         // FLOAT64
-        Vector.DoubleVec doubleLeft = Vectors.doubleVector(new double[]{0.0, 10.0, 20.0, 30.0}, leftNulls);
-        Vector.DoubleVec doubleRight = Vectors.doubleVector(new double[]{5.0, 0.0, 4.0, 3.0}, rightNulls);
+        DoubleVec doubleLeft = Vectors.doubleVector(new double[]{0.0, 10.0, 20.0, 30.0}, leftNulls);
+        DoubleVec doubleRight = Vectors.doubleVector(new double[]{5.0, 0.0, 4.0, 3.0}, rightNulls);
         Schema doubleSchema = Schema.from(List.of(
                 new Field("a", Scalar.FLOAT64, true),
                 new Field("b", Scalar.FLOAT64, true)));
         RecordBatch doubleBatch = new RecordBatch(doubleSchema, new Vector[]{doubleLeft, doubleRight});
 
-        Vector.DoubleVector doubleAdd = (Vector.DoubleVector) ExprEvaluator.eval(
+        DoubleVec.DoubleVector doubleAdd = (DoubleVec.DoubleVector) ExprEvaluator.eval(
                 new BinaryExpr(new ColumnRef("a"), ArithmeticOp.Add, new ColumnRef("b")), doubleBatch);
         assertTrue(doubleAdd.isNull(0));
         assertTrue(doubleAdd.isNull(1));
         assertEquals(24.0, doubleAdd.value(2));
         assertEquals(33.0, doubleAdd.value(3));
 
-        Vector.DoubleVector doubleSub = (Vector.DoubleVector) ExprEvaluator.eval(
+        DoubleVec.DoubleVector doubleSub = (DoubleVec.DoubleVector) ExprEvaluator.eval(
                 new BinaryExpr(new ColumnRef("a"), ArithmeticOp.Subtract, new ColumnRef("b")), doubleBatch);
         assertEquals(16.0, doubleSub.value(2));
 
-        Vector.DoubleVector doubleMul = (Vector.DoubleVector) ExprEvaluator.eval(
+        DoubleVec.DoubleVector doubleMul = (DoubleVec.DoubleVector) ExprEvaluator.eval(
                 new BinaryExpr(new ColumnRef("a"), ArithmeticOp.Multiply, new ColumnRef("b")), doubleBatch);
         assertEquals(80.0, doubleMul.value(2));
 
-        Vector.DoubleVector doubleDiv = (Vector.DoubleVector) ExprEvaluator.eval(
+        DoubleVec.DoubleVector doubleDiv = (DoubleVec.DoubleVector) ExprEvaluator.eval(
                 new BinaryExpr(new ColumnRef("a"), ArithmeticOp.Divide, new ColumnRef("b")), doubleBatch);
         assertEquals(5.0, doubleDiv.value(2));
     }

@@ -1,17 +1,17 @@
 package org.kogu.queryengine.expression;
 
-import java.util.ArrayList;
-import java.util.BitSet;
-import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.kogu.queryengine.expression.Expr.*;
-import org.kogu.queryengine.columnar.RecordBatch;
-import org.kogu.queryengine.columnar.Vector;
-import org.kogu.queryengine.columnar.Vectors;
+import org.kogu.queryengine.columnar.*;
+import org.kogu.queryengine.expression.Expr.LogicalOp;
+import org.kogu.queryengine.expression.Expr.UnaryOp;
 import org.kogu.queryengine.type.Field;
 import org.kogu.queryengine.type.Schema;
 import org.kogu.queryengine.type.Type.Scalar;
+
+import java.util.ArrayList;
+import java.util.BitSet;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -217,64 +217,38 @@ class ExprEvaluatorTest {
         assertTrue(orResult.isNull(7), "null OR null must be invalid (null)");
     }
 
-    @Test
-    @DisplayName("Invariant 4: One 8-row batch against batches of 3, 3, 2 — concatenate, compare slot for slot")
-    void boundaryInvisibilityOneBatchAgainstSlicesOfThreeThreeTwo() {
-        int[] distances = {4, 10, 999, 7, 2, 8, 12, 1};
-        BitSet distNulls = new BitSet();
-        distNulls.set(2); // row 2 is null in distances
+    private static void assertVectorsEqualSlotForSlot(Vector expected, List<Vector> pieces) {
+        int totalLength = pieces.stream().mapToInt(Vector::length).sum();
+        assertEquals(expected.length(), totalLength, "Total length across pieces must equal single batch length");
 
-        int[] fares = {15, 25, 30, 5, 50, 999, 40, 20};
-        BitSet fareNulls = new BitSet();
-        fareNulls.set(5); // row 5 is null in fares
+        int globalRow = 0;
+        for (Vector piece : pieces) {
+            for (int localRow = 0; localRow < piece.length(); localRow++) {
+                assertEquals(expected.isNull(globalRow), piece.isNull(localRow),
+                        "Nullness mismatch at global row " + globalRow);
 
-        Schema schema = Schema.from(List.of(
-                new Field("trip_distance", Scalar.INT32, true),
-                new Field("fare_amount", Scalar.INT32, true)
-        ));
-
-        // 1 single 8-row batch
-        RecordBatch singleBatch = new RecordBatch(schema, new Vector[]{
-                new Vector.IntVector(distances, 0, 8, distNulls),
-                new Vector.IntVector(fares, 0, 8, fareNulls)
-        });
-
-        // 3 partitioned batches of sizes 3, 3, 2 windowed over the same backing data
-        RecordBatch batch1 = new RecordBatch(schema, new Vector[]{
-                new Vector.IntVector(distances, 0, 3, distNulls),
-                new Vector.IntVector(fares, 0, 3, fareNulls)
-        });
-        RecordBatch batch2 = new RecordBatch(schema, new Vector[]{
-                new Vector.IntVector(distances, 3, 3, distNulls),
-                new Vector.IntVector(fares, 3, 3, fareNulls)
-        });
-        RecordBatch batch3 = new RecordBatch(schema, new Vector[]{
-                new Vector.IntVector(distances, 6, 2, distNulls),
-                new Vector.IntVector(fares, 6, 2, fareNulls)
-        });
-
-        List<RecordBatch> pieces = List.of(batch1, batch2, batch3);
-
-        List<Expr> expressionsToTest = List.of(
-                // Arithmetic
-                new BinaryExpr(new ColumnRef("fare_amount"), ArithmeticOp.Add, new ColumnRef("trip_distance")),
-                // Comparison
-                new BinaryExpr(new ColumnRef("trip_distance"), ComparisonOp.GT, new Literal.Int32(5)),
-                // Compound: (trip_distance > 5) AND (fare_amount > 20)
-                new LogicalExpr(
-                        new BinaryExpr(new ColumnRef("trip_distance"), ComparisonOp.GT, new Literal.Int32(5)),
-                        LogicalOp.AND,
-                        new BinaryExpr(new ColumnRef("fare_amount"), ComparisonOp.GT, new Literal.Int32(20))
-                )
-        );
-
-        for (Expr expr : expressionsToTest) {
-            Vector singleResult = ExprEvaluator.eval(expr, singleBatch);
-            List<Vector> pieceResults = pieces.stream()
-                    .map(b -> ExprEvaluator.eval(expr, b))
-                    .toList();
-
-            assertVectorsEqualSlotForSlot(singleResult, pieceResults);
+                if (!expected.isNull(globalRow)) {
+                    switch (expected) {
+                        case IntVec exp when piece instanceof IntVec act ->
+                                assertEquals(exp.value(globalRow), act.value(localRow),
+                                        "Int value mismatch at global row " + globalRow);
+                        case Vector.LongVec exp when piece instanceof Vector.LongVec act ->
+                                assertEquals(exp.value(globalRow), act.value(localRow),
+                                        "Long value mismatch at global row " + globalRow);
+                        case DoubleVec exp when piece instanceof DoubleVec act ->
+                                assertEquals(exp.value(globalRow), act.value(localRow), 1e-9,
+                                        "Double value mismatch at global row " + globalRow);
+                        case Vector.BoolVec exp when piece instanceof Vector.BoolVec act ->
+                                assertEquals(exp.value(globalRow), act.value(localRow),
+                                        "Boolean value mismatch at global row " + globalRow);
+                        case Vector.Utf8Vec exp when piece instanceof Vector.Utf8Vec act ->
+                                assertEquals(exp.value(globalRow), act.value(localRow),
+                                        "String value mismatch at global row " + globalRow);
+                        default -> fail("Unexpected vector type: " + expected.getClass());
+                    }
+                }
+                globalRow++;
+            }
         }
     }
 
@@ -319,38 +293,64 @@ class ExprEvaluatorTest {
         return List.copyOf(list);
     }
 
-    private static void assertVectorsEqualSlotForSlot(Vector expected, List<Vector> pieces) {
-        int totalLength = pieces.stream().mapToInt(Vector::length).sum();
-        assertEquals(expected.length(), totalLength, "Total length across pieces must equal single batch length");
+    @Test
+    @DisplayName("Invariant 4: One 8-row batch against batches of 3, 3, 2 — concatenate, compare slot for slot")
+    void boundaryInvisibilityOneBatchAgainstSlicesOfThreeThreeTwo() {
+        int[] distances = {4, 10, 999, 7, 2, 8, 12, 1};
+        BitSet distNulls = new BitSet();
+        distNulls.set(2); // row 2 is null in distances
 
-        int globalRow = 0;
-        for (Vector piece : pieces) {
-            for (int localRow = 0; localRow < piece.length(); localRow++) {
-                assertEquals(expected.isNull(globalRow), piece.isNull(localRow),
-                        "Nullness mismatch at global row " + globalRow);
+        int[] fares = {15, 25, 30, 5, 50, 999, 40, 20};
+        BitSet fareNulls = new BitSet();
+        fareNulls.set(5); // row 5 is null in fares
 
-                if (!expected.isNull(globalRow)) {
-                    switch (expected) {
-                        case Vector.IntVec exp when piece instanceof Vector.IntVec act ->
-                                assertEquals(exp.value(globalRow), act.value(localRow),
-                                        "Int value mismatch at global row " + globalRow);
-                        case Vector.LongVec exp when piece instanceof Vector.LongVec act ->
-                                assertEquals(exp.value(globalRow), act.value(localRow),
-                                        "Long value mismatch at global row " + globalRow);
-                        case Vector.DoubleVec exp when piece instanceof Vector.DoubleVec act ->
-                                assertEquals(exp.value(globalRow), act.value(localRow), 1e-9,
-                                        "Double value mismatch at global row " + globalRow);
-                        case Vector.BoolVec exp when piece instanceof Vector.BoolVec act ->
-                                assertEquals(exp.value(globalRow), act.value(localRow),
-                                        "Boolean value mismatch at global row " + globalRow);
-                        case Vector.Utf8Vec exp when piece instanceof Vector.Utf8Vec act ->
-                                assertEquals(exp.value(globalRow), act.value(localRow),
-                                        "String value mismatch at global row " + globalRow);
-                        default -> fail("Unexpected vector type: " + expected.getClass());
-                    }
-                }
-                globalRow++;
-            }
+        Schema schema = Schema.from(List.of(
+                new Field("trip_distance", Scalar.INT32, true),
+                new Field("fare_amount", Scalar.INT32, true)
+        ));
+
+        // 1 single 8-row batch
+        RecordBatch singleBatch = new RecordBatch(schema, new Vector[]{
+                new IntVec.IntVector(distances, 0, 8, distNulls),
+                new IntVec.IntVector(fares, 0, 8, fareNulls)
+        });
+
+        // 3 partitioned batches of sizes 3, 3, 2 windowed over the same backing data
+        RecordBatch batch1 = new RecordBatch(schema, new Vector[]{
+                new IntVec.IntVector(distances, 0, 3, distNulls),
+                new IntVec.IntVector(fares, 0, 3, fareNulls)
+        });
+        RecordBatch batch2 = new RecordBatch(schema, new Vector[]{
+                new IntVec.IntVector(distances, 3, 3, distNulls),
+                new IntVec.IntVector(fares, 3, 3, fareNulls)
+        });
+        RecordBatch batch3 = new RecordBatch(schema, new Vector[]{
+                new IntVec.IntVector(distances, 6, 2, distNulls),
+                new IntVec.IntVector(fares, 6, 2, fareNulls)
+        });
+
+        List<RecordBatch> pieces = List.of(batch1, batch2, batch3);
+
+        List<Expr> expressionsToTest = List.of(
+                // Arithmetic
+                new BinaryExpr(new ColumnRef("fare_amount"), ArithmeticOp.Add, new ColumnRef("trip_distance")),
+                // Comparison
+                new BinaryExpr(new ColumnRef("trip_distance"), ComparisonOp.GT, new Literal.Int32(5)),
+                // Compound: (trip_distance > 5) AND (fare_amount > 20)
+                new LogicalExpr(
+                        new BinaryExpr(new ColumnRef("trip_distance"), ComparisonOp.GT, new Literal.Int32(5)),
+                        LogicalOp.AND,
+                        new BinaryExpr(new ColumnRef("fare_amount"), ComparisonOp.GT, new Literal.Int32(20))
+                )
+        );
+
+        for (Expr expr : expressionsToTest) {
+            Vector singleResult = ExprEvaluator.eval(expr, singleBatch);
+            List<Vector> pieceResults = pieces.stream()
+                    .map(b -> ExprEvaluator.eval(expr, b))
+                    .toList();
+
+            assertVectorsEqualSlotForSlot(singleResult, pieceResults);
         }
     }
 }

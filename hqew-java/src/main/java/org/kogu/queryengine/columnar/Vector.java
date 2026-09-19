@@ -3,7 +3,6 @@ package org.kogu.queryengine.columnar;
 import org.kogu.queryengine.type.Type;
 
 import java.util.BitSet;
-import java.util.Objects;
 
 import static org.kogu.queryengine.columnar.Vector.*;
 
@@ -17,112 +16,38 @@ public sealed interface Vector permits
 
     default boolean isNotNull(int index) {return !isNull(index);}
 
-    /// -----------------------------------------------------------
-    // level 2: element type. This is what kernels take.
-    sealed interface DoubleVec extends Vector permits DoubleVector, ConstantDouble {
-        double value(int index);
-
-        @Override
-        default Type type() {return Type.Scalar.FLOAT64;}
+    /// Gathers rows at the given indices into a new compact vector of the
+    /// same element type. Constant storage expands through value()/isNull();
+    /// null validity is remapped to the output positions.
+    static Vector gather(Vector in, int[] rows) {
+        return switch (in) {
+            case IntVec v -> v.gather(rows);
+            case LongVec v -> v.gather(rows);
+            case DoubleVec v -> v.gather(rows);
+            case BoolVec v -> v.gather(rows);
+            case Utf8Vec v -> v.gather(rows);
+        };
     }
 
-    sealed interface IntVec extends Vector permits IntVector, ConstantInt {
-        int value(int index);
-
-        @Override
-        default Type type() {return Type.Scalar.INT32;}
-    }
-
-    sealed interface LongVec extends Vector permits LongVector, ConstantLong {
-        long value(int index);
-
-        @Override
-        default Type type() {return Type.Scalar.INT64;}
-    }
-
-    sealed interface BoolVec extends Vector permits BooleanVector, ConstantBool {
-        boolean value(int index);
-
-        @Override
-        default Type type() {return Type.Scalar.BOOLEAN;}
-    }
-
-    sealed interface Utf8Vec extends Vector permits StringVector, ConstantUtf8 {
-        String value(int index);
-
-        @Override
-        default Type type() {return Type.Scalar.UTF8;}
-    }
-
-    /// -----------------------------------------------------------
-    // level 3: storage. Your existing record, two words changed.
-    record DoubleVector(double[] values, int offset, int length,
-                        BitSet nullIndices) implements DoubleVec {
-        public DoubleVector {
-            Objects.requireNonNull(values, "values");
-            Objects.requireNonNull(nullIndices, "nullIndices");
-            Vector.positiveLength(length);
-            Vector.validateWindow(offset, length, values.length);
-        }
-
-        @Override
-        public double value(int index) {
-            Vector.validateIndex(index, length);
-            return values[offset + index];
-        }
-
-        @Override
-        public boolean isNull(int index) {
-            Vector.validateIndex(index, length);
-            return nullIndices.get(offset + index);
+    static void validateWindow(int offset, int length, int arrayLength) {
+        if (offset < 0 || length < 0 || offset > arrayLength || length > arrayLength - offset) {
+            throw new IndexOutOfBoundsException();
         }
     }
 
-    record ConstantDouble(double n, int length) implements DoubleVec {
-        public ConstantDouble {
-            Vector.positiveLength(length);
-        }
-
-        @Override
-        public double value(int index) {
-            Vector.validateIndex(index, length);
-            return n;
-        }
-
-        @Override
-        public boolean isNull(int index) {
-            Vector.validateIndex(index, length);
-            return false;
+    static void validateIndex(int index, int length) {
+        if (index < 0 || index >= length) {
+            throw new IndexOutOfBoundsException();
         }
     }
 
-    record IntVector(int[] values, int offset, int length,
-                     BitSet nullIndices) implements IntVec {
-        public IntVector {
-            Objects.requireNonNull(values, "values");
-            Objects.requireNonNull(nullIndices, "nullIndices");
-            Vector.positiveLength(length);
-            Vector.validateWindow(offset, length, values.length);
-        }
-
-        public int value(int index) {
-            Vector.validateIndex(index, length);
-            return values[offset + index];
-        }
-
-        @Override
-        public boolean isNull(int index) {
-            Vector.validateIndex(index, length);
-            return nullIndices.get(offset + index);
-        }
-
+    static void positiveLength(int n) {
+        if (n < 0) throw new IllegalArgumentException("Length must be >= 0");
     }
 
     record LongVector(long[] values, int offset, int length,
                       BitSet nullIndices) implements LongVec {
         public LongVector {
-            Objects.requireNonNull(values, "values");
-            Objects.requireNonNull(nullIndices, "nullIndices");
             Vector.positiveLength(length);
             Vector.validateWindow(offset, length, values.length);
         }
@@ -143,8 +68,6 @@ public sealed interface Vector permits
     record StringVector(String[] values, int offset, int length,
                         BitSet nullIndices) implements Utf8Vec {
         public StringVector {
-            Objects.requireNonNull(values, "values");
-            Objects.requireNonNull(nullIndices, "nullIndices");
             Vector.positiveLength(length);
             Vector.validateWindow(offset, length, values.length);
         }
@@ -165,8 +88,6 @@ public sealed interface Vector permits
     record BooleanVector(boolean[] values, int offset, int length,
                          BitSet nullIndices) implements BoolVec {
         public BooleanVector {
-            Objects.requireNonNull(values, "values");
-            Objects.requireNonNull(nullIndices, "nullIndices");
             Vector.positiveLength(length);
             Vector.validateWindow(offset, length, values.length);
         }
@@ -184,21 +105,64 @@ public sealed interface Vector permits
 
     }
 
-    record ConstantInt(int n, int length) implements IntVec {
-        public ConstantInt {
-            Vector.positiveLength(length);
+    sealed interface LongVec extends Vector permits LongVector, ConstantLong {
+        long value(int index);
+
+        /// Gathers rows at the given indices into a new compact vector.
+        /// Null validity is remapped to the output positions.
+        /// Constant storage may return a constant result without expansion.
+        default LongVec gather(int[] rows) {
+            long[] values = new long[rows.length];
+            BitSet nulls = new BitSet();
+            for (int k = 0; k < rows.length; k++) {
+                values[k] = value(rows[k]);
+                if (isNull(rows[k])) nulls.set(k);
+            }
+            return new LongVector(values, 0, rows.length, nulls);
         }
 
         @Override
-        public boolean isNull(int index) {
-            Vector.validateIndex(index, length());
-            return false;
+        default Type type() {return Type.Scalar.INT64;}
+    }
+
+    sealed interface BoolVec extends Vector permits BooleanVector, ConstantBool {
+        boolean value(int index);
+
+        /// Gathers rows at the given indices into a new compact vector.
+        /// Null validity is remapped to the output positions.
+        /// Constant storage may return a constant result without expansion.
+        default BoolVec gather(int[] rows) {
+            boolean[] values = new boolean[rows.length];
+            BitSet nulls = new BitSet();
+            for (int k = 0; k < rows.length; k++) {
+                values[k] = value(rows[k]);
+                if (isNull(rows[k])) nulls.set(k);
+            }
+            return new BooleanVector(values, 0, rows.length, nulls);
         }
 
-        public int value(int index) {
-            Vector.validateIndex(index, length);
-            return n;
+        @Override
+        default Type type() {return Type.Scalar.BOOLEAN;}
+    }
+
+    sealed interface Utf8Vec extends Vector permits StringVector, ConstantUtf8 {
+        String value(int index);
+
+        /// Gathers rows at the given indices into a new compact vector.
+        /// Null validity is remapped to the output positions.
+        /// Constant storage may return a constant result without expansion.
+        default Utf8Vec gather(int[] rows) {
+            String[] values = new String[rows.length];
+            BitSet nulls = new BitSet();
+            for (int k = 0; k < rows.length; k++) {
+                values[k] = value(rows[k]);
+                if (isNull(rows[k])) nulls.set(k);
+            }
+            return new StringVector(values, 0, rows.length, nulls);
         }
+
+        @Override
+        default Type type() {return Type.Scalar.UTF8;}
     }
 
     record ConstantLong(long n, int length) implements LongVec {
@@ -215,6 +179,13 @@ public sealed interface Vector permits
         public long value(int index) {
             Vector.validateIndex(index, length);
             return n;
+        }
+
+        /// Every selected row reads the same value, so the gathered result
+        /// is the same constant with a new length; no expansion, no copy.
+        @Override
+        public LongVec gather(int[] rows) {
+            return new ConstantLong(n, rows.length);
         }
     }
 
@@ -233,6 +204,13 @@ public sealed interface Vector permits
             Vector.validateIndex(index, length);
             return value;
         }
+
+        /// Every selected row reads the same value, so the gathered result
+        /// is the same constant with a new length; no expansion, no copy.
+        @Override
+        public BoolVec gather(int[] rows) {
+            return new ConstantBool(value, rows.length);
+        }
     }
 
     record ConstantUtf8(String s, int length) implements Utf8Vec {
@@ -250,21 +228,12 @@ public sealed interface Vector permits
             Vector.validateIndex(index, length);
             return s;
         }
-    }
 
-    private static void validateWindow(int offset, int length, int arrayLength) {
-        if (offset < 0 || length < 0 || offset > arrayLength || length > arrayLength - offset) {
-            throw new IndexOutOfBoundsException();
+        /// Every selected row reads the same value, so the gathered result
+        /// is the same constant with a new length; no expansion, no copy.
+        @Override
+        public Utf8Vec gather(int[] rows) {
+            return new ConstantUtf8(s, rows.length);
         }
-    }
-
-    private static void validateIndex(int index, int length) {
-        if (index < 0 || index >= length) {
-            throw new IndexOutOfBoundsException();
-        }
-    }
-
-    private static void positiveLength(int n) {
-        if (n < 0) throw new IllegalArgumentException("Length must be >= 0");
     }
 }

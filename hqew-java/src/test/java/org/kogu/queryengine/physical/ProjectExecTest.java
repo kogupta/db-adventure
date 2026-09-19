@@ -1,9 +1,7 @@
 package org.kogu.queryengine.physical;
 
 import org.junit.jupiter.api.Test;
-import org.kogu.queryengine.columnar.RecordBatch;
-import org.kogu.queryengine.columnar.Vector;
-import org.kogu.queryengine.columnar.Vectors;
+import org.kogu.queryengine.columnar.*;
 import org.kogu.queryengine.expression.ArithmeticOp;
 import org.kogu.queryengine.expression.BinaryExpr;
 import org.kogu.queryengine.expression.ColumnRef;
@@ -57,7 +55,7 @@ class ProjectExecTest {
         assertSame(input.vectorOf("id"), output.vectorOf("id"));
         assertSame(input.vectorOf("fare"), output.vectorOf("fare_copy"));
 
-        Vector.DoubleVec adjusted = (Vector.DoubleVec) output.vectorOf("adjusted_fare");
+        DoubleVec adjusted = (DoubleVec) output.vectorOf("adjusted_fare");
         assertEquals(11.0, adjusted.value(0));
         assertEquals(22.0, adjusted.value(1));
         assertEquals(33.0, adjusted.value(2));
@@ -87,7 +85,7 @@ class ProjectExecTest {
 
         var output = exec.next();
         assertNotNull(output);
-        Vector.DoubleVec adjusted = (Vector.DoubleVec) output.vectorOf("adjusted_fare");
+        DoubleVec adjusted = (DoubleVec) output.vectorOf("adjusted_fare");
         assertEquals(11.0, adjusted.value(0));
         assertTrue(adjusted.isNull(1));
         assertEquals(33.0, adjusted.value(2));
@@ -107,8 +105,8 @@ class ProjectExecTest {
         assertNotNull(secondOutput);
         assertEquals(2, firstOutput.rowCount());
         assertEquals(1, secondOutput.rowCount());
-        assertEquals(1, ((Vector.IntVec) firstOutput.vectorOf("id")).value(0));
-        assertEquals(3, ((Vector.IntVec) secondOutput.vectorOf("id")).value(0));
+        assertEquals(1, ((IntVec) firstOutput.vectorOf("id")).value(0));
+        assertEquals(3, ((IntVec) secondOutput.vectorOf("id")).value(0));
         assertNull(exec.next());
     }
 

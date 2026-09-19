@@ -1,17 +1,12 @@
 package org.kogu.queryengine.columnar;
 
-import static org.junit.jupiter.api.Assertions.assertAll;
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import org.junit.jupiter.api.Test;
 
 import java.util.BitSet;
 import java.util.List;
 import java.util.function.IntFunction;
 
-import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.*;
 
 class VectorNullBitmapTest {
 
@@ -21,9 +16,9 @@ class VectorNullBitmapTest {
         nullIndices.set(0);
         nullIndices.set(2);
 
-        Vector.IntVector ints = new Vector.IntVector(new int[]{10, 20, 30}, 0, 3, nullIndices);
+        IntVec.IntVector ints = new IntVec.IntVector(new int[]{10, 20, 30}, 0, 3, nullIndices);
         Vector.LongVector longs = new Vector.LongVector(new long[]{10L, 20L, 30L}, 0, 3, nullIndices);
-        Vector.DoubleVector doubles = new Vector.DoubleVector(new double[]{1.0, 2.0, 3.0}, 0, 3, nullIndices);
+        DoubleVec.DoubleVector doubles = new DoubleVec.DoubleVector(new double[]{1.0, 2.0, 3.0}, 0, 3, nullIndices);
         Vector.StringVector strings = new Vector.StringVector(new String[]{"a", "b", "c"}, 0, 3, nullIndices);
         Vector.BooleanVector booleans = new Vector.BooleanVector(new boolean[]{true, false, true}, 0, 3, nullIndices);
 
@@ -41,7 +36,7 @@ class VectorNullBitmapTest {
         nullIndices.set(0);
         nullIndices.set(1);
         nullIndices.set(2);
-        Vector.IntVector vector = new Vector.IntVector(new int[]{10, 20, 30}, 0, 3, nullIndices);
+        IntVec.IntVector vector = new IntVec.IntVector(new int[]{10, 20, 30}, 0, 3, nullIndices);
 
         assertTrue(vector.isNull(0));
         assertTrue(vector.isNull(1));
@@ -53,7 +48,7 @@ class VectorNullBitmapTest {
     void usesBackingArrayIndexesForNullsInsideAWindow() {
         BitSet nullIndices = new BitSet();
         nullIndices.set(3);
-        Vector.IntVector vector = new Vector.IntVector(
+        IntVec.IntVector vector = new IntVec.IntVector(
                 new int[]{9, 10, 20, 30, 99}, 1, 3, nullIndices);
 
         assertFalse(vector.isNull(0));
@@ -64,7 +59,7 @@ class VectorNullBitmapTest {
 
     @Test
     void rejectsNegativeAndWindowEdgeNullChecks() {
-        Vector.IntVector vector = Vectors.intVector(new int[]{10, 20, 30});
+        IntVec.IntVector vector = Vectors.intVector(new int[]{10, 20, 30});
 
         assertAll(
                 () -> assertThrows(IndexOutOfBoundsException.class, () -> vector.isNull(-1)),
@@ -76,7 +71,7 @@ class VectorNullBitmapTest {
     void rejectsNullBitmapAtConstruction() {
         assertThrows(
                 NullPointerException.class,
-                () -> new Vector.IntVector(new int[]{10}, 0, 1, null));
+                () -> new IntVec.IntVector(new int[]{10}, 0, 1, null));
     }
 
 
@@ -84,9 +79,9 @@ class VectorNullBitmapTest {
     void nullSlotValuesMayDifferButGatedReadsRemainIdentical() {
         BitSet nullIndices = new BitSet();
         nullIndices.set(1);
-        Vector.IntVector first = new Vector.IntVector(
+        IntVec.IntVector first = new IntVec.IntVector(
                 new int[]{10, -999, 30}, 0, 3, nullIndices);
-        Vector.IntVector second = new Vector.IntVector(
+        IntVec.IntVector second = new IntVec.IntVector(
                 new int[]{10, 12345, 30}, 0, 3, (BitSet) nullIndices.clone());
 
         assertTrue(first.isNull(1));

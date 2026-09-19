@@ -326,7 +326,7 @@ The block between BEGIN_MUTABLE_STATE and END_MUTABLE_STATE is rewritten in plac
 #+begin_src clojure
 {:state-version 1
  :course-status :in-progress
- :position {:unit "qe.10.project-exec" :stage "stage-2" :checkpoint nil :status :in-progress}
+ :position {:unit "qe.11.filter-exec" :stage "stage-2" :checkpoint nil :status :in-progress}
  :environment {:language :java :jdk 25 :build-tool :maven :repo-root "hqew-java" :test-framework :junit-5}
  :mastery {"qe.00.orientation" :demonstrated
            "qe.01.row-vs-column" :demonstrated
@@ -338,7 +338,8 @@ The block between BEGIN_MUTABLE_STATE and END_MUTABLE_STATE is rewritten in plac
            "qe.07.vector-expression-eval" :demonstrated
            "qe.08.operator-contract" :demonstrated
            "qe.09.memory-scan" :demonstrated
-           "qe.10.project-exec" :working}
+           "qe.10.project-exec" :demonstrated
+           "qe.11.filter-exec" :working}
  :implementation
  {:capabilities
   ["lesson1 Main: graduation-query shape (filter->group->avg->sort desc) over both row objects and parallel int[] columns; equivalence test passes (rowEval/columnEval)"
@@ -356,6 +357,7 @@ The block between BEGIN_MUTABLE_STATE and END_MUTABLE_STATE is rewritten in plac
    "qe.08 operator contract: Exec exposes stable schema plus @Nullable RecordBatch next(); BufferedExec final next() skips zero-row batches, latches permanent exhaustion, and prevents pulls after EOF; null is the single exhaustion sentinel and 9 focused execution tests pass"
    "qe.09 MemoryScanExec: top-level physical operator; deterministic in-memory source preserves supplied batch order; BufferedExec enforces zero-row suppression and permanent exhaustion; 14 focused tests pass"
    "qe.10 ProjectExec: top-level unary physical operator accepts ordered Projection(name, expression) items; derives output schema before execution, reuses ColumnRef vectors, evaluates derived expressions through ExprEvaluator, preserves row counts and input batch boundaries, propagates nulls, and rejects empty/duplicate projections; four focused tests were added"
+   "qe.11 gather abstraction: Vector.gather(Vector, int[]) dispatches to per-element-type default gather(rows) that copies selected values and remaps null validity; Constant* records override gather to return the same constant with rows.length, giving O(1) deferred materialization instead of per-row copies; FilterExec uses mask.isNotNull && value survivor selection plus Vector.gather per column"
    "Default Maven compiler configuration runs Error Prone NullAway in JSpecify mode for annotated project packages; `mvn clean test` passes 85 tests with zero failures and zero errors"
   :current-design ["Package boundaries are type, columnar, expression, and physical under lowercase org.kogu.queryengine; physical operators are top-level classes beside Exec/BufferedExec; Type as sealed interface chosen over enum for future nested types; expression and vector metadata use Type plus independent nullability, while composite vectors and composite operator semantics are deferred until a query requires them; Schema stores LinkedHashMap name->field; Vector contract mechanism-free; nulls are data not holes; batch boundaries are execution detail; Expr type rules reject mixed widths deliberately (INT32+INT64 rejected until a query forces coercion)"]
   :known-correctness-gaps
@@ -378,8 +380,9 @@ The block between BEGIN_MUTABLE_STATE and END_MUTABLE_STATE is rewritten in plac
   {:id "D-008" :decision "Exec pull contract: interface Exec { Schema schema(); @Nullable RecordBatch next(); } — one pull method; null = exhausted (stays null on later calls); a non-null batch always has rowCount>=1, zero-row batches never cross next(); schema() is knowable before the first pull; children are construction-time private fields, so one interface serves 0/1/2-child operators; BufferedExec centralizes non-empty-batch filtering and permanent exhaustion over nullable pull()." :reason "A single method makes hasNext/next desynchronization impossible; JSpecify and default NullAway enforce callers to handle the nullable exhaustion state without wrapper allocation."}
   {:id "D-009" :decision "Expression result metadata carries Type plus an independent nullable flag; Vector.type() also returns Type." :reason "Avoid later metadata-signature migrations when Type gains variants; define composite storage and operator semantics only when composites are introduced."}
   {:id "D-010" :decision "Use lowercase org.kogu.queryengine with type, columnar, expression, and physical packages; keep physical operators as top-level classes." :reason "Package boundaries expose dependency direction and avoid types/exec/utils grab bags as the engine grows."}
-  {:id "D-011" :decision "Run Error Prone NullAway in the default Maven compiler configuration using JSpecify mode." :reason "Nullness checking must be part of ordinary builds rather than an optional profile; the repository already declares JSpecify, Error Prone, and NullAway."}]
- :next-action "qe.10 completion probe: explain why projection preserves row count, why schema derivation happens before the first pull, and why a direct ColumnRef can reuse its input vector while a derived expression cannot."
+  {:id "D-011" :decision "Run Error Prone NullAway in the default Maven compiler configuration using JSpecify mode." :reason "Nullness checking must be part of ordinary builds rather than an optional profile; the repository already declares JSpecify, Error Prone, and NullAway."}
+  {:id "D-012" :decision "gather(rows) lives on element-type interfaces with array-expanding defaults; Constant* overrides return the same constant at rows.length." :reason "Gathering from a constant never needs the indices' values, so selection stays O(1) and constant columns stay deferred (extends D-006) instead of being force-expanded at operator boundaries."}]
+ :next-action "qe.11 entry probe: for predicate mask [TRUE, FALSE, null, TRUE], predict which rows survive; then decide whether a batch with zero surviving rows should cross next() or trigger another child pull."
 #+end_src
 # END_MUTABLE_STATE
 

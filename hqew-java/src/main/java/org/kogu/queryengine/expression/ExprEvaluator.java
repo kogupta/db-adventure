@@ -1,9 +1,7 @@
 package org.kogu.queryengine.expression;
 
+import org.kogu.queryengine.columnar.*;
 import org.kogu.queryengine.expression.Expr.LogicalOp;
-import org.kogu.queryengine.columnar.RecordBatch;
-import org.kogu.queryengine.columnar.Vector;
-import org.kogu.queryengine.columnar.Vectors;
 
 import java.util.BitSet;
 import java.util.function.IntConsumer;
@@ -17,9 +15,9 @@ public final class ExprEvaluator {
     public static Vector eval(Expr expr, RecordBatch batch) {
         return switch (expr) {
             case ColumnRef(var name) -> batch.vectorOf(name);
-            case Literal.Int32(var n) -> new ConstantInt(n, batch.rowCount());
+            case Literal.Int32(var n) -> new IntVec.ConstantInt(n, batch.rowCount());
             case Literal.Int64(var n) -> new ConstantLong(n, batch.rowCount());
-            case Literal.Float64(var d) -> new ConstantDouble(d, batch.rowCount());
+            case Literal.Float64(var d) -> new DoubleVec.ConstantDouble(d, batch.rowCount());
             case Literal.Str(var s) -> new ConstantUtf8(s, batch.rowCount());
             case Literal.Bool bool -> new ConstantBool(bool.value, batch.rowCount());
             case BinaryExpr(var left, var op, var right) -> {
@@ -121,7 +119,7 @@ public final class ExprEvaluator {
     }
 
     /// ----- nearly identical methods ----
-    private static IntVector numericInts(IntVec left, ArithmeticOp op, IntVec right) {
+    private static IntVec.IntVector numericInts(IntVec left, ArithmeticOp op, IntVec right) {
         int[] result = new int[left.length()];
         BitSet nulls = perSlot(
                 i -> left.isNotNull(i) && right.isNotNull(i),
@@ -139,7 +137,7 @@ public final class ExprEvaluator {
         return Vectors.longVector(result, nulls);
     }
 
-    private static DoubleVector numericDoubles(DoubleVec left, ArithmeticOp op, DoubleVec right) {
+    private static DoubleVec.DoubleVector numericDoubles(DoubleVec left, ArithmeticOp op, DoubleVec right) {
         double[] result = new double[left.length()];
         BitSet nulls = perSlot(
                 i -> left.isNotNull(i) && right.isNotNull(i),

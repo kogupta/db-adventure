@@ -1,16 +1,14 @@
 package org.kogu.queryengine.columnar;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-
-import java.util.ArrayList;
-import java.util.List;
-
 import org.junit.jupiter.api.Test;
 import org.kogu.queryengine.type.Field;
 import org.kogu.queryengine.type.Schema;
 import org.kogu.queryengine.type.Type;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.*;
 
 class RecordBatchTest {
 
@@ -56,16 +54,15 @@ class RecordBatchTest {
         assertEquals("vector lengths do not match at index 1", error.getMessage());
     }
 
-    @Test
-    void happyPathFindsVectorBySchemaFieldName() {
-        Schema schema = tripsSchema();
-        Vector.IntVector fareAmount = Vectors.intVector(new int[]{10, 20, 30});
-        RecordBatch batch = new RecordBatch(schema, new Vector[]{
-                Vectors.intVector(new int[]{1, 2, 1}),
-                Vectors.intVector(new int[]{6, 7, 8}), fareAmount});
-
-        assertEquals(3, batch.rowCount());
-        assertSame(fareAmount, batch.vectorOf("fare_amount"));
+    private static List<Integer> readTripDistances(List<RecordBatch> batches) {
+        List<Integer> rows = new ArrayList<>();
+        for (RecordBatch batch : batches) {
+            IntVec.IntVector distances = (IntVec.IntVector) batch.vectorOf("trip_distance");
+            for (int row = 0; row < batch.rowCount(); row++) {
+                rows.add(distances.value(row));
+            }
+        }
+        return rows;
     }
 
     @Test
@@ -104,14 +101,15 @@ class RecordBatchTest {
         return batches;
     }
 
-    private static List<Integer> readTripDistances(List<RecordBatch> batches) {
-        List<Integer> rows = new ArrayList<>();
-        for (RecordBatch batch : batches) {
-            Vector.IntVector distances = (Vector.IntVector) batch.vectorOf("trip_distance");
-            for (int row = 0; row < batch.rowCount(); row++) {
-                rows.add(distances.value(row));
-            }
-        }
-        return rows;
+    @Test
+    void happyPathFindsVectorBySchemaFieldName() {
+        Schema schema = tripsSchema();
+        IntVec.IntVector fareAmount = Vectors.intVector(new int[]{10, 20, 30});
+        RecordBatch batch = new RecordBatch(schema, new Vector[]{
+                Vectors.intVector(new int[]{1, 2, 1}),
+                Vectors.intVector(new int[]{6, 7, 8}), fareAmount});
+
+        assertEquals(3, batch.rowCount());
+        assertSame(fareAmount, batch.vectorOf("fare_amount"));
     }
 }
